@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Link from "next/link";
 import { Hero, PostCard } from "@/components/public";
 import { Button, Badge } from "@/components/ui";
