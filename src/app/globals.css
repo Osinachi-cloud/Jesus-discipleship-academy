@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans antialiased bg-cream-100 text-charcoal-800;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif text-navy-800;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-navy-800 text-gold-500 hover:bg-navy-900 focus:ring-navy-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-cream-200 text-navy-800 hover:bg-cream-300 focus:ring-navy-500;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+
+  .btn-outline {
+    @apply btn border border-navy-300 bg-white text-navy-800 hover:bg-cream-100 focus:ring-navy-500;
+  }
+
+  .input {
+    @apply block w-full rounded-lg border border-charcoal-200 px-4 py-2 text-charcoal-800 placeholder-charcoal-400 focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 bg-white;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-charcoal-700 mb-1;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-cream-300 overflow-hidden;
+  }
+
+  .prose-content {
+    @apply prose prose-lg max-w-none;
+    @apply prose-headings:font-serif prose-headings:text-navy-800;
+    @apply prose-p:text-charcoal-800 prose-p:leading-relaxed;
+    @apply prose-a:text-gold-600 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-gold-700;
+    @apply prose-blockquote:border-l-4 prose-blockquote:border-gold-500 prose-blockquote:bg-cream-200 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:italic prose-blockquote:text-charcoal-700;
+    @apply prose-ul:list-disc prose-ol:list-decimal;
+    @apply prose-img:rounded-lg;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+.tiptap {
+  @apply min-h-[300px] p-4 focus:outline-none;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  @apply text-gray-400 float-left h-0 pointer-events-none;
+  content: attr(data-placeholder);
+}
+
+.tiptap h1 {
+  @apply text-3xl font-bold mb-4;
+}
+
+.tiptap h2 {
+  @apply text-2xl font-bold mb-3;
+}
+
+.tiptap h3 {
+  @apply text-xl font-bold mb-2;
+}
+
+.tiptap p {
+  @apply mb-4 leading-relaxed;
+}
+
+.tiptap ul {
+  @apply list-disc pl-6 mb-4;
+}
+
+.tiptap ol {
+  @apply list-decimal pl-6 mb-4;
+}
+
+.tiptap blockquote {
+  @apply border-l-4 border-gold-500 bg-cream-200 py-2 px-4 italic my-4;
+}
+
+.tiptap a {
+  @apply text-gold-600 underline hover:text-gold-700;
+}
+
+.tiptap img {
+  @apply max-w-full h-auto rounded-lg my-4;
+}
