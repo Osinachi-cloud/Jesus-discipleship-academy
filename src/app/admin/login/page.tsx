@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button, Input, Card, CardContent, Alert } from "@/components/ui";
 import { BookOpen } from "lucide-react";
 
@@ -85,11 +86,16 @@ export default function LoginPage() {
             >
               Sign In
             </Button>
-          </form>
 
-          <p className="text-center text-sm text-charcoal-500 mt-6">
-            Default: admin@discipleship.org / admin123
-          </p>
+            <div className="text-center mt-4">
+              <Link
+                href="/admin/forgot-password"
+                className="text-sm text-charcoal-600 hover:text-gold-600"
+              >
+                Forgot password?
+              </Link>
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>

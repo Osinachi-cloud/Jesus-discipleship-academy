@@ -7,15 +7,22 @@ async function main() {
   console.log("Seeding database...\n");
 
   // Create Admin User
-  const hashedPassword = await bcrypt.hash("admin123", 12);
+  const hashedPassword = await bcrypt.hash("Sinach=1234", 12);
+  const securityAnswer1 = await bcrypt.hash("obatej", 12);
+  const securityAnswer2 = await bcrypt.hash("silver", 12);
   const admin = await prisma.user.upsert({
-    where: { email: "admin@discipleship.org" },
-    update: {},
+    where: { email: "uchenna.ogbodo.001@gmail.com" },
+    update: {
+      securityAnswer1,
+      securityAnswer2,
+    },
     create: {
-      email: "admin@discipleship.org",
+      email: "uchenna.ogbodo.001@gmail.com",
       password: hashedPassword,
-      name: "Pastor John Maxwell",
+      name: "Uchenna Ogbodo",
       role: "admin",
+      securityAnswer1,
+      securityAnswer2,
     },
   });
   console.log("Admin user created:", admin.email);
@@ -1192,7 +1199,8 @@ async function main() {
 
   console.log("\nSeeding complete!");
   console.log("-------------------");
-  console.log("Admin login: admin@discipleship.org / admin123");
+  console.log("Admin login: uchenna.ogbodo.001@gmail.com / Sinach=1234");
+  console.log("Security answers: 'obatej' / 'silver'");
 }
 
 main()

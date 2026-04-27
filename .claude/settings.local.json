@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(yarn tsc *)",
-      "Bash(yarn db:seed)"
+      "Bash(yarn db:seed)",
+      "Bash(npx prisma *)"
     ]
   }
 }

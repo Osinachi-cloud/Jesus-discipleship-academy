@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -17,8 +18,15 @@ import {
   Image as ImageIcon,
   Undo,
   Redo,
+  Strikethrough,
+  BookOpen,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  StrikethroughReplacement,
+  ScriptureReference,
+} from "./extensions";
 
 interface RichTextEditorProps {
   content: string;
@@ -31,6 +39,12 @@ export function RichTextEditor({
   onChange,
   placeholder = "Start writing...",
 }: RichTextEditorProps) {
+  const [showStrikethroughModal, setShowStrikethroughModal] = useState(false);
+  const [showScriptureModal, setShowScriptureModal] = useState(false);
+  const [replacementText, setReplacementText] = useState("");
+  const [scriptureReference, setScriptureReference] = useState("");
+  const [scriptureVerseText, setScriptureVerseText] = useState("");
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -49,6 +63,8 @@ export function RichTextEditor({
           class: "text-primary-600 underline",
         },
       }),
+      StrikethroughReplacement,
+      ScriptureReference,
     ],
     content,
     editorProps: {
@@ -78,6 +94,53 @@ export function RichTextEditor({
     if (url) {
       editor.chain().focus().setLink({ href: url }).run();
     }
+  };
+
+  const openStrikethroughModal = () => {
+    if (editor.state.selection.empty) {
+      alert("Please select the text you want to strike through first.");
+      return;
+    }
+    setReplacementText("");
+    setShowStrikethroughModal(true);
+  };
+
+  const applyStrikethrough = () => {
+    if (replacementText.trim()) {
+      editor
+        .chain()
+        .focus()
+        .setStrikethroughReplacement(replacementText.trim())
+        .run();
+    }
+    setShowStrikethroughModal(false);
+    setReplacementText("");
+  };
+
+  const openScriptureModal = () => {
+    if (editor.state.selection.empty) {
+      alert("Please select the scripture reference text first (e.g., 'John 3:16').");
+      return;
+    }
+    setScriptureReference("");
+    setScriptureVerseText("");
+    setShowScriptureModal(true);
+  };
+
+  const applyScriptureReference = () => {
+    if (scriptureReference.trim() && scriptureVerseText.trim()) {
+      editor
+        .chain()
+        .focus()
+        .setScriptureReference({
+          reference: scriptureReference.trim(),
+          verseText: scriptureVerseText.trim(),
+        })
+        .run();
+    }
+    setShowScriptureModal(false);
+    setScriptureReference("");
+    setScriptureVerseText("");
   };
 
   const ToolbarButton = ({
