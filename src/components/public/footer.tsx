@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, Heart } from "lucide-react";
+import { BookOpen, Heart, Phone, Mail } from "lucide-react";
 
 export function Footer() {
   return (
@@ -102,14 +102,32 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-navy-700 mt-8 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-cream-300">
-            &copy; {new Date().getFullYear()} Jesus Discipleship Academy. All
-            rights reserved.
-          </p>
-          <p className="text-sm text-cream-300 flex items-center gap-1">
-            Made with <Heart className="h-4 w-4 text-gold-500" /> for the Kingdom
-          </p>
+        <div className="border-t border-navy-700 mt-8 pt-8">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
+            <a
+              href="tel:+2348167144768"
+              className="flex items-center gap-2 text-cream-300 hover:text-gold-500 transition-colors"
+            >
+              <Phone className="h-4 w-4" />
+              <span>+234 816 714 4768</span>
+            </a>
+            <a
+              href="mailto:jesusdiscipleshipacademy@gmail.com"
+              className="flex items-center gap-2 text-cream-300 hover:text-gold-500 transition-colors"
+            >
+              <Mail className="h-4 w-4" />
+              <span>jesusdiscipleshipacademy@gmail.com</span>
+            </a>
+          </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-cream-300">
+              &copy; {new Date().getFullYear()} Jesus Discipleship Academy. All
+              rights reserved.
+            </p>
+            <p className="text-sm text-cream-300 flex items-center gap-1">
+              Made with <Heart className="h-4 w-4 text-gold-500" /> for the Kingdom
+            </p>
+          </div>
         </div>
       </div>
     </footer>

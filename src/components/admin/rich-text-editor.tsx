@@ -234,6 +234,21 @@ export function RichTextEditor({
         </ToolbarButton>
         <div className="w-px h-6 bg-gray-300 mx-1" />
         <ToolbarButton
+          onClick={openStrikethroughModal}
+          active={editor.isActive("strikethroughReplacement")}
+          title="Strikethrough with Replacement"
+        >
+          <Strikethrough className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={openScriptureModal}
+          active={editor.isActive("scriptureReference")}
+          title="Scripture Reference"
+        >
+          <BookOpen className="h-4 w-4" />
+        </ToolbarButton>
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}
           title="Undo"
         >
@@ -247,6 +262,110 @@ export function RichTextEditor({
         </ToolbarButton>
       </div>
       <EditorContent editor={editor} className="bg-white" />
+
+      {showStrikethroughModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Strikethrough with Replacement</h3>
+              <button
+                onClick={() => setShowStrikethroughModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              The selected text will be struck through. Enter the replacement word:
+            </p>
+            <input
+              type="text"
+              value={replacementText}
+              onChange={(e) => setReplacementText(e.target.value)}
+              placeholder="Enter replacement word"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500 mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applyStrikethrough();
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowStrikethroughModal(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applyStrikethrough}
+                className="px-4 py-2 bg-navy-800 text-white rounded-lg hover:bg-navy-900"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showScriptureModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Add Scripture Reference</h3>
+              <button
+                onClick={() => setShowScriptureModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Readers will see the verse text when they hover over the selected scripture reference.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reference (e.g., John 3:16)
+                </label>
+                <input
+                  type="text"
+                  value={scriptureReference}
+                  onChange={(e) => setScriptureReference(e.target.value)}
+                  placeholder="John 3:16"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Verse Text
+                </label>
+                <textarea
+                  value={scriptureVerseText}
+                  onChange={(e) => setScriptureVerseText(e.target.value)}
+                  placeholder="For God so loved the world..."
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowScriptureModal(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applyScriptureReference}
+                className="px-4 py-2 bg-navy-800 text-white rounded-lg hover:bg-navy-900"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

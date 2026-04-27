@@ -127,3 +127,136 @@
 .tiptap img {
   @apply max-w-full h-auto rounded-lg my-4;
 }
+
+/* Strikethrough with replacement */
+.strikethrough-replacement {
+  position: relative;
+  text-decoration: none;
+}
+
+.strikethrough-replacement::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='6'%3E%3Cpath d='M0 3 Q 25 0 50 3 T 100 3' stroke='%23dc2626' stroke-width='2' fill='none'/%3E%3C/svg%3E") repeat-x;
+  background-size: 20px 6px;
+  pointer-events: none;
+}
+
+.strikethrough-replacement::after {
+  content: " [" attr(data-replacement) "]";
+  color: #16a34a;
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* Scripture reference with hover tooltip */
+.scripture-reference {
+  position: relative;
+  color: #0d4f8b;
+  font-weight: 500;
+  border-bottom: 1px dashed #0d4f8b;
+  cursor: help;
+}
+
+.scripture-reference:hover::before {
+  content: attr(data-reference) ": " attr(data-verse-text);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #fef3c7;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.5;
+  white-space: normal;
+  width: max-content;
+  max-width: 350px;
+  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  margin-bottom: 8px;
+}
+
+.scripture-reference:hover::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: #1e293b;
+  margin-bottom: -8px;
+}
+
+/* Prose content styles for public view */
+.prose-content .strikethrough-replacement {
+  position: relative;
+  text-decoration: none;
+}
+
+.prose-content .strikethrough-replacement::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='6'%3E%3Cpath d='M0 3 Q 25 0 50 3 T 100 3' stroke='%23dc2626' stroke-width='2' fill='none'/%3E%3C/svg%3E") repeat-x;
+  background-size: 20px 6px;
+  pointer-events: none;
+}
+
+.prose-content .strikethrough-replacement::after {
+  content: " [" attr(data-replacement) "]";
+  color: #16a34a;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.prose-content .scripture-reference {
+  position: relative;
+  color: #0d4f8b;
+  font-weight: 500;
+  border-bottom: 1px dashed #0d4f8b;
+  cursor: help;
+}
+
+.prose-content .scripture-reference:hover::before {
+  content: attr(data-reference) ": " attr(data-verse-text);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #fef3c7;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.5;
+  white-space: normal;
+  width: max-content;
+  max-width: 350px;
+  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  margin-bottom: 8px;
+}
+
+.prose-content .scripture-reference:hover::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: #1e293b;
+  margin-bottom: -8px;
+}
