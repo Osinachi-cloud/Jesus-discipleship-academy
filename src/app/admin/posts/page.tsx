@@ -21,6 +21,7 @@ interface Post {
   title: string;
   slug: string;
   status: string;
+  views: number;
   category: { id: string; name: string } | null;
   createdAt: string;
   _count: { comments: number };
@@ -188,6 +189,9 @@ export default function PostsPage() {
                         Status
                       </th>
                       <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">
+                        Views
+                      </th>
+                      <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">
                         Comments
                       </th>
                       <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">
@@ -219,6 +223,11 @@ export default function PostsPage() {
                           >
                             {post.status}
                           </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-gray-600">
+                            {post.views || 0}
+                          </span>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-gray-600">

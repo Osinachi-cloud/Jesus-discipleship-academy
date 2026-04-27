@@ -27,6 +27,7 @@ model Post {
   excerpt       String?
   featuredImage String?
   status        String    @default("draft")
+  views         Int       @default(0)
   categoryId    String?
   category      Category? @relation(fields: [categoryId], references: [id])
   comments      Comment[]

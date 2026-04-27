@@ -6,7 +6,8 @@ import { CommentSection, ShareButton } from "@/components/public";
 import { Badge } from "@/components/ui";
 import prisma from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
-import { Calendar, ArrowLeft } from "lucide-react";
+import { Calendar, ArrowLeft, Eye } from "lucide-react";
+import { ViewTracker } from "./view-tracker";
 import type { Metadata } from "next";
 
 interface PostPageProps {
@@ -101,7 +102,12 @@ export default async function PostPage({ params }: PostPageProps) {
                 <Calendar className="h-4 w-4" />
                 {formatDate(post.publishedAt || post.createdAt)}
               </span>
+              <span className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                {post.views} {post.views === 1 ? "view" : "views"}
+              </span>
             </div>
+            <ViewTracker postId={post.id} />
           </header>
 
           {post.featuredImage && (
