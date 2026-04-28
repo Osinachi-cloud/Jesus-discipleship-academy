@@ -1,4 +1,4 @@
-import { Navbar, Footer } from "@/components/public";
+import { Navbar, Footer, ScriptureTooltip } from "@/components/public";
 
 export default function PublicLayout({
   children,
@@ -10,6 +10,7 @@ export default function PublicLayout({
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <ScriptureTooltip />
     </div>
   );
 }

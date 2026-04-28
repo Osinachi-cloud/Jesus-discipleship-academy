@@ -168,37 +168,32 @@
   cursor: help;
 }
 
-.scripture-reference:hover::before {
-  content: attr(data-reference) ": " attr(data-verse-text);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1e293b;
-  color: #fef3c7;
-  padding: 12px 16px;
+/* Scripture tooltip container */
+.scripture-tooltip-container {
+  width: 380px;
+  max-width: calc(100vw - 20px);
+  background: #ffffff;
   border-radius: 8px;
-  font-size: 14px;
-  font-weight: 400;
-  font-style: italic;
-  line-height: 1.5;
-  white-space: normal;
-  width: max-content;
-  max-width: 350px;
-  z-index: 1000;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  margin-bottom: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
 }
 
-.scripture-reference:hover::after {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 8px solid transparent;
-  border-top-color: #1e293b;
-  margin-bottom: -8px;
+.scripture-tooltip-header {
+  background: #6b7280;
+  color: #ffffff;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+.scripture-tooltip-body {
+  padding: 16px 20px;
+  color: #374151;
+  font-size: 15px;
+  line-height: 1.7;
+  background: #f9fafb;
 }
 
 /* Prose content styles for public view */
@@ -238,37 +233,4 @@
   font-weight: 500;
   border-bottom: 1px dashed #0d4f8b;
   cursor: help;
-}
-
-.prose-content .scripture-reference:hover::before {
-  content: attr(data-reference) ": " attr(data-verse-text);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1e293b;
-  color: #fef3c7;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 400;
-  font-style: italic;
-  line-height: 1.5;
-  white-space: normal;
-  width: max-content;
-  max-width: 350px;
-  z-index: 1000;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  margin-bottom: 8px;
-}
-
-.prose-content .scripture-reference:hover::after {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 8px solid transparent;
-  border-top-color: #1e293b;
-  margin-bottom: -8px;
 }
