@@ -5,10 +5,12 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
+import Underline from "@tiptap/extension-underline";
 import { Button } from "@/components/ui";
 import {
   Bold,
   Italic,
+  Underline as UnderlineIcon,
   List,
   ListOrdered,
   Quote,
@@ -63,6 +65,7 @@ export function RichTextEditor({
           class: "text-primary-600 underline",
         },
       }),
+      Underline,
       StrikethroughReplacement,
       ScriptureReference,
     ],
@@ -183,6 +186,13 @@ export function RichTextEditor({
           title="Italic"
         >
           <Italic className="h-4 w-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          active={editor.isActive("underline")}
+          title="Underline"
+        >
+          <UnderlineIcon className="h-4 w-4" />
         </ToolbarButton>
         <div className="w-px h-6 bg-gray-300 mx-1" />
         <ToolbarButton
