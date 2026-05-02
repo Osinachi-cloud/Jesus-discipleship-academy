@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "10");
     const status = searchParams.get("status");
-    const categoryId = searchParams.get("categoryId");
+    const subcategoryId = searchParams.get("subcategoryId");
     const search = searchParams.get("search");
 
     const where: any = {};
@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
-    if (categoryId) {
-      where.categoryId = categoryId;
+    if (subcategoryId) {
+      where.subcategoryId = subcategoryId;
     }
 
     if (search) {
@@ -34,7 +34,9 @@ export async function GET(request: NextRequest) {
       prisma.post.findMany({
         where,
         include: {
-          category: true,
+          subcategory: {
+            include: { series: true },
+          },
           _count: { select: { comments: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, content, excerpt, featuredImage, status, categoryId, order } = body;
+    const { title, content, excerpt, featuredImage, status, subcategoryId, order } = body;
 
     if (!title || !content) {
       return NextResponse.json(
@@ -92,12 +94,14 @@ export async function POST(request: NextRequest) {
         excerpt,
         featuredImage,
         status: status || "draft",
-        categoryId: categoryId || null,
+        subcategoryId: subcategoryId || null,
         order: order ?? null,
         publishedAt: status === "published" ? new Date() : null,
       },
       include: {
-        category: true,
+        subcategory: {
+          include: { series: true },
+        },
       },
     });
 

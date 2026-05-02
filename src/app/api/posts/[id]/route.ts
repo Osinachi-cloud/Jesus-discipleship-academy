@@ -12,7 +12,9 @@ export async function GET(
     const post = await prisma.post.findUnique({
       where: { id: params.id },
       include: {
-        category: true,
+        subcategory: {
+          include: { series: true },
+        },
         comments: {
           where: { approved: true },
           orderBy: { createdAt: "desc" },
@@ -46,7 +48,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { title, content, excerpt, featuredImage, status, categoryId, order } = body;
+    const { title, content, excerpt, featuredImage, status, subcategoryId, order } = body;
 
     const existingPost = await prisma.post.findUnique({
       where: { id: params.id },
@@ -82,7 +84,7 @@ export async function PUT(
             ? featuredImage
             : existingPost.featuredImage,
         status: status || existingPost.status,
-        categoryId: categoryId !== undefined ? categoryId : existingPost.categoryId,
+        subcategoryId: subcategoryId !== undefined ? subcategoryId : existingPost.subcategoryId,
         order: order !== undefined ? order : existingPost.order,
         publishedAt:
           !wasPublished && isNowPublished
@@ -90,7 +92,9 @@ export async function PUT(
             : existingPost.publishedAt,
       },
       include: {
-        category: true,
+        subcategory: {
+          include: { series: true },
+        },
       },
     });
 

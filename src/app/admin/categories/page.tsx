@@ -28,113 +28,105 @@ import {
   Tag,
 } from "lucide-react";
 
-interface Category {
+interface Series {
   id: string;
   name: string;
   slug: string;
   description?: string | null;
   order?: number | null;
-  parentId?: string | null;
-  children?: Category[];
-  _count: {
-    posts: number;
-    children?: number;
-  };
+  subcategories: Subcategory[];
+  _count: { subcategories: number };
 }
 
-interface FlatCategory {
+interface Subcategory {
   id: string;
   name: string;
   slug: string;
   description?: string | null;
-  parentId?: string | null;
-  _count?: { posts: number; children?: number };
+  order?: number | null;
+  seriesId?: string | null;
+  series?: Series | null;
+  _count: { posts: number };
 }
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [allCategories, setAllCategories] = useState<FlatCategory[]>([]);
+  const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSeriesModal, setShowSeriesModal] = useState(false);
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [managingSeries, setManagingSeries] = useState<Category | null>(null);
-  const [categoryName, setCategoryName] = useState("");
-  const [categoryDescription, setCategoryDescription] = useState("");
+  const [editingSeries, setEditingSeries] = useState<Series | null>(null);
+  const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
+  const [managingSeries, setManagingSeries] = useState<Series | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [selectedCategoryToAdd, setSelectedCategoryToAdd] = useState("");
-  const [managedSubcategories, setManagedSubcategories] = useState<Category[]>([]);
+  const [expandedSeries, setExpandedSeries] = useState<Set<string>>(new Set());
+  const [selectedSubcategoryToAdd, setSelectedSubcategoryToAdd] = useState("");
+  const [managedSubcategories, setManagedSubcategories] = useState<Subcategory[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"series" | "subcategories">("series");
+  const [draggedSubcategory, setDraggedSubcategory] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchCategories();
+    fetchData();
   }, []);
 
-  const fetchCategories = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const [hierarchyRes, flatRes] = await Promise.all([
-        fetch("/api/categories"),
-        fetch("/api/categories?flat=true"),
+      const [seriesRes, subcategoriesRes] = await Promise.all([
+        fetch("/api/series"),
+        fetch("/api/subcategories"),
       ]);
-      const hierarchyResult = await hierarchyRes.json();
-      const flatResult = await flatRes.json();
-      setCategories(hierarchyResult.data || []);
-      setAllCategories(flatResult.data || []);
+      const seriesData = await seriesRes.json();
+      const subcategoriesData = await subcategoriesRes.json();
+      setSeriesList(seriesData.data || []);
+      setSubcategories(subcategoriesData.data || []);
       const allIds = new Set<string>();
-      (hierarchyResult.data || []).forEach((cat: Category) => allIds.add(cat.id));
-      setExpandedCategories(allIds);
+      (seriesData.data || []).forEach((s: Series) => allIds.add(s.id));
+      setExpandedSeries(allIds);
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const toggleExpand = (id: string) => {
-    const newExpanded = new Set(expandedCategories);
+    const newExpanded = new Set(expandedSeries);
     if (newExpanded.has(id)) {
       newExpanded.delete(id);
     } else {
       newExpanded.add(id);
     }
-    setExpandedCategories(newExpanded);
+    setExpandedSeries(newExpanded);
   };
 
-  // Get unassigned subcategories - categories with no parent AND no children (not a series)
   const getUnassignedSubcategories = () => {
-    return allCategories.filter(c => {
-      // No parent = top-level
-      // No children = not a series (series have children)
-      const hasNoParent = !c.parentId;
-      const hasNoChildren = !c._count?.children || c._count.children === 0;
-      return hasNoParent && hasNoChildren;
-    });
+    return subcategories.filter(s => !s.seriesId);
   };
 
-  // Create new series
+  // Series CRUD
   const handleCreateSeries = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoryName.trim()) return;
+    if (!name.trim()) return;
     setSaving(true);
     try {
-      const maxOrder = categories.reduce((max, c) => Math.max(max, c.order || 0), 0);
-      await fetch("/api/categories", {
+      const maxOrder = seriesList.reduce((max, s) => Math.max(max, s.order || 0), 0);
+      const res = await fetch("/api/series", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: categoryName,
-          description: categoryDescription || null,
-          order: maxOrder + 1,
-          parentId: null,
-          isSeries: true,
-        }),
+        body: JSON.stringify({ name, description: description || null, order: maxOrder + 1 }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to create series");
+        return;
+      }
       closeSeriesModal();
-      fetchCategories();
+      fetchData();
     } catch (error) {
       console.error("Error creating series:", error);
     } finally {
@@ -142,23 +134,84 @@ export default function CategoriesPage() {
     }
   };
 
-  // Create standalone subcategory
-  const handleCreateSubcategory = async (e: React.FormEvent) => {
+  const handleUpdateSeries = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoryName.trim()) return;
+    if (!name.trim() || !editingSeries) return;
     setSaving(true);
     try {
-      await fetch("/api/categories", {
+      const res = await fetch(`/api/series/${editingSeries.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: description || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to update series");
+        return;
+      }
+      closeSeriesModal();
+      fetchData();
+    } catch (error) {
+      console.error("Error updating series:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSeries = async (id: string) => {
+    if (!confirm("Delete this series? Subcategories will be unassigned.")) return;
+    try {
+      await fetch(`/api/series/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting series:", error);
+    }
+  };
+
+  const handleMoveSeries = async (series: Series, direction: "up" | "down") => {
+    const currentIndex = seriesList.findIndex(s => s.id === series.id);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= seriesList.length) return;
+    const targetSeries = seriesList[targetIndex];
+    const currentOrder = series.order ?? currentIndex;
+    const targetOrder = targetSeries.order ?? targetIndex;
+    try {
+      await Promise.all([
+        fetch(`/api/series/${series.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order: targetOrder }),
+        }),
+        fetch(`/api/series/${targetSeries.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order: currentOrder }),
+        }),
+      ]);
+      fetchData();
+    } catch (error) {
+      console.error("Error moving series:", error);
+    }
+  };
+
+  // Subcategory CRUD
+  const handleCreateSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/subcategories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: categoryName,
-          description: categoryDescription || null,
-          parentId: null,
-        }),
+        body: JSON.stringify({ name, description: description || null }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to create subcategory");
+        return;
+      }
       closeSubcategoryModal();
-      fetchCategories();
+      fetchData();
     } catch (error) {
       console.error("Error creating subcategory:", error);
     } finally {
@@ -166,150 +219,70 @@ export default function CategoriesPage() {
     }
   };
 
-  // Update category
-  const handleUpdateCategory = async (e: React.FormEvent) => {
+  const handleUpdateSubcategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoryName.trim() || !editingCategory) return;
+    if (!name.trim() || !editingSubcategory) return;
     setSaving(true);
     try {
-      await fetch(`/api/categories/${editingCategory.id}`, {
+      const res = await fetch(`/api/subcategories/${editingSubcategory.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: categoryName,
-          description: categoryDescription || null,
-        }),
+        body: JSON.stringify({ name, description: description || null }),
       });
-      closeSeriesModal();
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to update subcategory");
+        return;
+      }
       closeSubcategoryModal();
-      fetchCategories();
+      fetchData();
     } catch (error) {
-      console.error("Error updating category:", error);
+      console.error("Error updating subcategory:", error);
     } finally {
       setSaving(false);
     }
   };
 
-  // Move category up/down
-  const handleMove = async (category: Category, direction: "up" | "down", siblings: Category[]) => {
-    const currentIndex = siblings.findIndex(c => c.id === category.id);
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= siblings.length) return;
-    const targetCategory = siblings[targetIndex];
-    const currentOrder = category.order ?? currentIndex;
-    const targetOrder = targetCategory.order ?? targetIndex;
+  const handleDeleteSubcategory = async (id: string) => {
+    if (!confirm("Delete this subcategory?")) return;
     try {
-      await Promise.all([
-        fetch(`/api/categories/${category.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: targetOrder }),
-        }),
-        fetch(`/api/categories/${targetCategory.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: currentOrder }),
-        }),
-      ]);
-      fetchCategories();
+      await fetch(`/api/subcategories/${id}`, { method: "DELETE" });
+      fetchData();
     } catch (error) {
-      console.error("Error moving category:", error);
+      console.error("Error deleting subcategory:", error);
     }
   };
 
-  const handleEditSeries = (category: Category) => {
-    setEditingCategory(category);
-    setCategoryName(category.name);
-    setCategoryDescription(category.description || "");
-    setShowSeriesModal(true);
-  };
-
-  const handleEditSubcategory = (category: FlatCategory) => {
-    setEditingCategory(category as Category);
-    setCategoryName(category.name);
-    setCategoryDescription(category.description || "");
-    setShowSubcategoryModal(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this category?")) return;
-    try {
-      await fetch(`/api/categories/${id}`, { method: "DELETE" });
-      fetchCategories();
-    } catch (error) {
-      console.error("Error deleting category:", error);
-    }
-  };
-
-  const closeSeriesModal = () => {
-    setShowSeriesModal(false);
-    setCategoryName("");
-    setCategoryDescription("");
-    setEditingCategory(null);
-  };
-
-  const closeSubcategoryModal = () => {
-    setShowSubcategoryModal(false);
-    setCategoryName("");
-    setCategoryDescription("");
-    setEditingCategory(null);
-  };
-
-  // Manage subcategories modal
-  const handleManageSubcategories = (series: Category) => {
+  // Manage subcategories in series
+  const handleManageSubcategories = (series: Series) => {
     setManagingSeries(series);
-    setManagedSubcategories([...(series.children || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
-    setSelectedCategoryToAdd("");
+    setManagedSubcategories([...series.subcategories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+    setSelectedSubcategoryToAdd("");
     setShowManageModal(true);
   };
 
-  const closeManageModal = () => {
-    setShowManageModal(false);
-    setManagingSeries(null);
-    setManagedSubcategories([]);
-    setSelectedCategoryToAdd("");
-    setDraggedIndex(null);
-  };
-
-  // Get categories available to add (unassigned ones)
   const getAvailableForSeries = () => {
     if (!managingSeries) return [];
-    const currentSubIds = new Set(managedSubcategories.map(c => c.id));
-    // Show all categories that are not this series, not already in this series, and don't have children (not a series themselves)
-    return allCategories.filter(c => {
-      if (c.id === managingSeries.id) return false;
-      if (currentSubIds.has(c.id)) return false;
-      // Check if it's a series (has children)
-      const isSeries = categories.find(s => s.id === c.id);
-      if (isSeries) return false;
-      return true;
-    });
+    const currentIds = new Set(managedSubcategories.map(s => s.id));
+    return subcategories.filter(s => !currentIds.has(s.id) && (!s.seriesId || s.seriesId === managingSeries.id));
   };
 
-  // Add category to series via dropdown
   const handleAddToSeries = async () => {
-    if (!selectedCategoryToAdd || !managingSeries) return;
+    if (!selectedSubcategoryToAdd || !managingSeries) return;
     setSaving(true);
     try {
       const newOrder = managedSubcategories.length + 1;
-      await fetch(`/api/categories/${selectedCategoryToAdd}`, {
+      await fetch(`/api/subcategories/${selectedSubcategoryToAdd}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          parentId: managingSeries.id,
-          order: newOrder,
-        }),
+        body: JSON.stringify({ seriesId: managingSeries.id, order: newOrder }),
       });
-      const catToAdd = allCategories.find(c => c.id === selectedCategoryToAdd);
-      if (catToAdd) {
-        setManagedSubcategories(prev => [...prev, {
-          ...catToAdd,
-          order: newOrder,
-          _count: { posts: catToAdd._count?.posts || 0 },
-        } as Category]);
+      const added = subcategories.find(s => s.id === selectedSubcategoryToAdd);
+      if (added) {
+        setManagedSubcategories(prev => [...prev, { ...added, order: newOrder }]);
       }
-      setSelectedCategoryToAdd("");
-      fetchCategories();
+      setSelectedSubcategoryToAdd("");
+      fetchData();
     } catch (error) {
       console.error("Error adding to series:", error);
     } finally {
@@ -317,18 +290,17 @@ export default function CategoriesPage() {
     }
   };
 
-  // Remove from series
-  const handleRemoveFromSeries = async (categoryId: string) => {
-    if (!confirm("Remove from this series? It will become unassigned.")) return;
+  const handleRemoveFromSeries = async (subcategoryId: string) => {
+    if (!confirm("Remove from this series?")) return;
     setSaving(true);
     try {
-      await fetch(`/api/categories/${categoryId}`, {
+      await fetch(`/api/subcategories/${subcategoryId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parentId: null }),
+        body: JSON.stringify({ seriesId: null }),
       });
-      setManagedSubcategories(prev => prev.filter(c => c.id !== categoryId));
-      fetchCategories();
+      setManagedSubcategories(prev => prev.filter(s => s.id !== subcategoryId));
+      fetchData();
     } catch (error) {
       console.error("Error removing from series:", error);
     } finally {
@@ -336,7 +308,7 @@ export default function CategoriesPage() {
     }
   };
 
-  // Drag handlers
+  // Drag and drop
   const handleDragStart = (index: number) => setDraggedIndex(index);
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
@@ -363,8 +335,8 @@ export default function CategoriesPage() {
     setSaving(true);
     try {
       await Promise.all(
-        managedSubcategories.map((cat, index) =>
-          fetch(`/api/categories/${cat.id}`, {
+        managedSubcategories.map((sub, index) =>
+          fetch(`/api/subcategories/${sub.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ order: index + 1 }),
@@ -372,7 +344,7 @@ export default function CategoriesPage() {
         )
       );
       closeManageModal();
-      fetchCategories();
+      fetchData();
     } catch (error) {
       console.error("Error saving order:", error);
     } finally {
@@ -380,36 +352,24 @@ export default function CategoriesPage() {
     }
   };
 
-  // Drag from unassigned list to a series
-  const [draggedSubcategory, setDraggedSubcategory] = useState<string | null>(null);
-
-  const handleSubcategoryDragStart = (e: React.DragEvent, categoryId: string) => {
-    setDraggedSubcategory(categoryId);
+  // Drag subcategory to series
+  const handleSubcategoryDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedSubcategory(id);
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleSeriesDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
-
-  const handleSeriesDrop = async (e: React.DragEvent, series: Category) => {
+  const handleSeriesDrop = async (e: React.DragEvent, series: Series) => {
     e.preventDefault();
     if (!draggedSubcategory) return;
-
     setSaving(true);
     try {
-      const siblings = series.children || [];
-      const maxOrder = siblings.reduce((max, c) => Math.max(max, c.order || 0), 0);
-      await fetch(`/api/categories/${draggedSubcategory}`, {
+      const maxOrder = series.subcategories.reduce((max, s) => Math.max(max, s.order || 0), 0);
+      await fetch(`/api/subcategories/${draggedSubcategory}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          parentId: series.id,
-          order: maxOrder + 1,
-        }),
+        body: JSON.stringify({ seriesId: series.id, order: maxOrder + 1 }),
       });
-      fetchCategories();
+      fetchData();
     } catch (error) {
       console.error("Error assigning to series:", error);
     } finally {
@@ -418,54 +378,76 @@ export default function CategoriesPage() {
     }
   };
 
+  // Modals
+  const closeSeriesModal = () => {
+    setShowSeriesModal(false);
+    setEditingSeries(null);
+    setName("");
+    setDescription("");
+  };
+
+  const closeSubcategoryModal = () => {
+    setShowSubcategoryModal(false);
+    setEditingSubcategory(null);
+    setName("");
+    setDescription("");
+  };
+
+  const closeManageModal = () => {
+    setShowManageModal(false);
+    setManagingSeries(null);
+    setManagedSubcategories([]);
+    setSelectedSubcategoryToAdd("");
+    setDraggedIndex(null);
+  };
+
+  const openEditSeries = (series: Series) => {
+    setEditingSeries(series);
+    setName(series.name);
+    setDescription(series.description || "");
+    setShowSeriesModal(true);
+  };
+
+  const openEditSubcategory = (subcategory: Subcategory) => {
+    setEditingSubcategory(subcategory);
+    setName(subcategory.name);
+    setDescription(subcategory.description || "");
+    setShowSubcategoryModal(true);
+  };
+
   const unassignedSubcategories = getUnassignedSubcategories();
 
-  const renderSubcategory = (category: Category, index: number, siblings: Category[]) => (
-    <div
-      key={category.id}
-      className="flex items-center gap-3 py-3 px-4 bg-cream-50 border-b border-cream-200 last:border-b-0"
-    >
+  const renderSubcategory = (sub: Subcategory, index: number, siblings: Subcategory[]) => (
+    <div key={sub.id} className="flex items-center gap-3 py-3 px-4 bg-cream-50 border-b border-cream-200 last:border-b-0">
       <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gold-100 text-gold-700 text-sm font-bold">
-        {category.order ?? index + 1}
+        {sub.order ?? index + 1}
       </span>
       <FolderOpen className="h-4 w-4 text-gold-600 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <span className="font-medium text-charcoal-800">{category.name}</span>
-        {category.description && (
-          <p className="text-xs text-gray-500 truncate">{category.description}</p>
-        )}
+        <span className="font-medium text-charcoal-800">{sub.name}</span>
+        {sub.description && <p className="text-xs text-gray-500 truncate">{sub.description}</p>}
       </div>
-      <span className="text-sm text-gray-500 flex-shrink-0">
-        {category._count.posts} posts
-      </span>
+      <span className="text-sm text-gray-500 flex-shrink-0">{sub._count.posts} posts</span>
       <div className="flex items-center gap-1 flex-shrink-0">
-        <Button variant="ghost" size="sm" onClick={() => handleMove(category, "up", siblings)} disabled={index === 0} title="Move up">
-          <ArrowUp className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => handleMove(category, "down", siblings)} disabled={index === siblings.length - 1} title="Move down">
-          <ArrowDown className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => handleEditSubcategory(category)} title="Edit">
+        <Button variant="ghost" size="sm" onClick={() => openEditSubcategory(sub)} title="Edit">
           <Pencil className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => handleDelete(category.id)} title="Delete">
+        <Button variant="ghost" size="sm" onClick={() => handleDeleteSubcategory(sub.id)} title="Delete">
           <Trash2 className="h-4 w-4 text-red-500" />
         </Button>
       </div>
     </div>
   );
 
-  const renderSeries = (series: Category, index: number) => {
-    const hasChildren = series.children && series.children.length > 0;
-    const isExpanded = expandedCategories.has(series.id);
+  const renderSeries = (series: Series, index: number) => {
+    const hasSubcategories = series.subcategories && series.subcategories.length > 0;
+    const isExpanded = expandedSeries.has(series.id);
 
     return (
       <div
         key={series.id}
-        className={`border border-cream-300 rounded-lg overflow-hidden mb-4 transition-all ${
-          draggedSubcategory ? "ring-2 ring-gold-300 ring-dashed" : ""
-        }`}
-        onDragOver={handleSeriesDragOver}
+        className={`border border-cream-300 rounded-lg overflow-hidden mb-4 transition-all ${draggedSubcategory ? "ring-2 ring-gold-300 ring-dashed" : ""}`}
+        onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => handleSeriesDrop(e, series)}
       >
         <div className="bg-navy-800 text-cream-100 px-4 py-3">
@@ -473,7 +455,7 @@ export default function CategoriesPage() {
             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-navy-700 text-gold-500 font-bold">
               {series.order ?? index + 1}
             </span>
-            {hasChildren ? (
+            {hasSubcategories ? (
               <button onClick={() => toggleExpand(series.id)} className="p-1 hover:bg-navy-700 rounded">
                 {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
               </button>
@@ -483,25 +465,23 @@ export default function CategoriesPage() {
             <FolderTree className="h-5 w-5 text-gold-500 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <span className="font-semibold text-lg">{series.name}</span>
-              {series.description && (
-                <p className="text-sm text-cream-300 truncate">{series.description}</p>
-              )}
+              {series.description && <p className="text-sm text-cream-300 truncate">{series.description}</p>}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-sm text-cream-300">{series._count.children || 0} subcategories</span>
-              <Button variant="ghost" size="sm" onClick={() => handleManageSubcategories(series)} title="Manage Subcategories" className="text-gold-400 hover:text-gold-300 hover:bg-navy-700">
+              <span className="text-sm text-cream-300">{series._count.subcategories} subcategories</span>
+              <Button variant="ghost" size="sm" onClick={() => handleManageSubcategories(series)} title="Manage" className="text-gold-400 hover:text-gold-300 hover:bg-navy-700">
                 <Layers className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleMove(series, "up", categories)} disabled={index === 0} title="Move up" className="text-cream-200 hover:text-white hover:bg-navy-700">
+              <Button variant="ghost" size="sm" onClick={() => handleMoveSeries(series, "up")} disabled={index === 0} title="Move up" className="text-cream-200 hover:text-white hover:bg-navy-700">
                 <ArrowUp className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleMove(series, "down", categories)} disabled={index === categories.length - 1} title="Move down" className="text-cream-200 hover:text-white hover:bg-navy-700">
+              <Button variant="ghost" size="sm" onClick={() => handleMoveSeries(series, "down")} disabled={index === seriesList.length - 1} title="Move down" className="text-cream-200 hover:text-white hover:bg-navy-700">
                 <ArrowDown className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleEditSeries(series)} title="Edit" className="text-cream-200 hover:text-white hover:bg-navy-700">
+              <Button variant="ghost" size="sm" onClick={() => openEditSeries(series)} title="Edit" className="text-cream-200 hover:text-white hover:bg-navy-700">
                 <Pencil className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleDelete(series.id)} title="Delete" className="text-red-400 hover:text-red-300 hover:bg-navy-700">
+              <Button variant="ghost" size="sm" onClick={() => handleDeleteSeries(series.id)} title="Delete" className="text-red-400 hover:text-red-300 hover:bg-navy-700">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -510,15 +490,11 @@ export default function CategoriesPage() {
 
         {isExpanded && (
           <div className="bg-white">
-            {hasChildren ? (
-              <div>{series.children!.map((child, idx) => renderSubcategory(child, idx, series.children!))}</div>
+            {hasSubcategories ? (
+              <div>{series.subcategories.map((sub, idx) => renderSubcategory(sub, idx, series.subcategories))}</div>
             ) : (
               <div className="py-6 text-center text-gray-500">
-                {draggedSubcategory ? (
-                  <span className="text-gold-600 font-medium">Drop subcategory here</span>
-                ) : (
-                  "No subcategories yet. Drag one here or use the manage button."
-                )}
+                {draggedSubcategory ? <span className="text-gold-600 font-medium">Drop subcategory here</span> : "No subcategories. Drag one here or use manage."}
               </div>
             )}
           </div>
@@ -529,29 +505,20 @@ export default function CategoriesPage() {
 
   return (
     <div>
-      <AdminHeader title="Series & Categories" />
+      <AdminHeader title="Series & Subcategories" />
 
       <div className="p-6 space-y-6">
-        {/* Tab Navigation */}
         <div className="flex gap-2 border-b border-cream-300">
           <button
             onClick={() => setActiveTab("series")}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === "series"
-                ? "border-gold-500 text-gold-700"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "series" ? "border-gold-500 text-gold-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
           >
             <FolderTree className="h-4 w-4 inline mr-2" />
-            Series ({categories.length})
+            Series ({seriesList.length})
           </button>
           <button
             onClick={() => setActiveTab("subcategories")}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === "subcategories"
-                ? "border-gold-500 text-gold-700"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "subcategories" ? "border-gold-500 text-gold-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
           >
             <Tag className="h-4 w-4 inline mr-2" />
             Subcategories ({unassignedSubcategories.length} unassigned)
@@ -563,45 +530,36 @@ export default function CategoriesPage() {
         ) : activeTab === "series" ? (
           <>
             <div className="flex justify-between items-start gap-4">
-              <div>
-                <p className="text-gray-600 mb-2">
-                  <strong>Series</strong> are main topics that contain subcategories. Drag subcategories from the Subcategories tab onto a series, or use the <Layers className="h-4 w-4 inline" /> manage button.
-                </p>
-              </div>
+              <p className="text-gray-600">
+                <strong>Series</strong> group subcategories together. Drag subcategories from the Subcategories tab or use <Layers className="h-4 w-4 inline" /> manage.
+              </p>
               <Button onClick={() => setShowSeriesModal(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Series
               </Button>
             </div>
 
-            {categories.length === 0 ? (
+            {seriesList.length === 0 ? (
               <Card>
                 <CardContent className="py-12">
                   <Empty
                     title="No series yet"
-                    description="Create your first series to start organizing content."
+                    description="Create your first series."
                     icon={<FolderTree className="h-12 w-12" />}
-                    action={
-                      <Button onClick={() => setShowSeriesModal(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create First Series
-                      </Button>
-                    }
+                    action={<Button onClick={() => setShowSeriesModal(true)}><Plus className="h-4 w-4 mr-2" />Create Series</Button>}
                   />
                 </CardContent>
               </Card>
             ) : (
-              <div>{categories.map((series, index) => renderSeries(series, index))}</div>
+              <div>{seriesList.map((series, index) => renderSeries(series, index))}</div>
             )}
           </>
         ) : (
           <>
             <div className="flex justify-between items-start gap-4">
-              <div>
-                <p className="text-gray-600 mb-2">
-                  Create <strong>Subcategories</strong> here, then drag them onto a Series to assign them. Or use the dropdown in the Series manage modal.
-                </p>
-              </div>
+              <p className="text-gray-600">
+                Create <strong>Subcategories</strong> here, then drag them onto a Series or use the manage modal.
+              </p>
               <Button onClick={() => setShowSubcategoryModal(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Subcategory
@@ -613,52 +571,41 @@ export default function CategoriesPage() {
                 <CardContent className="py-12">
                   <Empty
                     title="No unassigned subcategories"
-                    description="All subcategories are assigned to a series. Create new ones here."
+                    description="All subcategories are assigned. Create new ones here."
                     icon={<Tag className="h-12 w-12" />}
-                    action={
-                      <Button onClick={() => setShowSubcategoryModal(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Subcategory
-                      </Button>
-                    }
+                    action={<Button onClick={() => setShowSubcategoryModal(true)}><Plus className="h-4 w-4 mr-2" />Create Subcategory</Button>}
                   />
                 </CardContent>
               </Card>
             ) : (
               <div className="grid gap-3">
-                {unassignedSubcategories.map((cat) => (
+                {unassignedSubcategories.map((sub) => (
                   <div
-                    key={cat.id}
+                    key={sub.id}
                     draggable
-                    onDragStart={(e) => handleSubcategoryDragStart(e, cat.id)}
+                    onDragStart={(e) => handleSubcategoryDragStart(e, sub.id)}
                     onDragEnd={() => setDraggedSubcategory(null)}
-                    className={`flex items-center gap-3 p-4 bg-white border border-cream-300 rounded-lg cursor-grab hover:shadow-md transition-all ${
-                      draggedSubcategory === cat.id ? "opacity-50 ring-2 ring-gold-500" : ""
-                    }`}
+                    className={`flex items-center gap-3 p-4 bg-white border border-cream-300 rounded-lg cursor-grab hover:shadow-md transition-all ${draggedSubcategory === sub.id ? "opacity-50 ring-2 ring-gold-500" : ""}`}
                   >
                     <GripVertical className="h-5 w-5 text-gray-400" />
                     <Tag className="h-5 w-5 text-gold-600" />
                     <div className="flex-1">
-                      <span className="font-medium text-charcoal-800">{cat.name}</span>
-                      {cat.description && (
-                        <p className="text-sm text-gray-500">{cat.description}</p>
-                      )}
+                      <span className="font-medium text-charcoal-800">{sub.name}</span>
+                      {sub.description && <p className="text-sm text-gray-500">{sub.description}</p>}
                     </div>
-                    <span className="text-sm text-gray-400">
-                      {cat._count?.posts || 0} posts
-                    </span>
+                    <span className="text-sm text-gray-400">{sub._count.posts} posts</span>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEditSubcategory(cat)} title="Edit">
+                      <Button variant="ghost" size="sm" onClick={() => openEditSubcategory(sub)} title="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(cat.id)} title="Delete">
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteSubcategory(sub.id)} title="Delete">
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
                   </div>
                 ))}
                 <p className="text-sm text-gray-500 text-center mt-2">
-                  Drag a subcategory to the Series tab and drop it on a series to assign it.
+                  Drag a subcategory to a Series to assign it.
                 </p>
               </div>
             )}
@@ -666,42 +613,32 @@ export default function CategoriesPage() {
         )}
       </div>
 
-      {/* Create/Edit Series Modal */}
-      <Modal isOpen={showSeriesModal} onClose={closeSeriesModal} title={editingCategory ? "Edit Series" : "New Series"}>
-        <form onSubmit={editingCategory ? handleUpdateCategory : handleCreateSeries} className="space-y-4">
-          {!editingCategory && (
-            <div className="bg-blue-50 text-blue-800 text-sm p-3 rounded-lg">
-              A <strong>Series</strong> groups subcategories together (e.g., "Discipleship" containing "Christology", "Theology").
-            </div>
-          )}
-          <Input label="Name" placeholder="e.g., Discipleship" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} required />
+      {/* Series Modal */}
+      <Modal isOpen={showSeriesModal} onClose={closeSeriesModal} title={editingSeries ? "Edit Series" : "New Series"}>
+        <form onSubmit={editingSeries ? handleUpdateSeries : handleCreateSeries} className="space-y-4">
+          <Input label="Name" placeholder="e.g., Discipleship" value={name} onChange={(e) => setName(e.target.value)} required />
           <div>
             <label className="label">Description (optional)</label>
-            <textarea value={categoryDescription} onChange={(e) => setCategoryDescription(e.target.value)} placeholder="Brief description..." className="input min-h-[80px]" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description..." className="input min-h-[80px]" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={closeSeriesModal}>Cancel</Button>
-            <Button type="submit" loading={saving} disabled={saving}>{editingCategory ? "Update" : "Create Series"}</Button>
+            <Button type="submit" loading={saving} disabled={saving}>{editingSeries ? "Update" : "Create"}</Button>
           </div>
         </form>
       </Modal>
 
-      {/* Create/Edit Subcategory Modal */}
-      <Modal isOpen={showSubcategoryModal} onClose={closeSubcategoryModal} title={editingCategory ? "Edit Subcategory" : "New Subcategory"}>
-        <form onSubmit={editingCategory ? handleUpdateCategory : handleCreateSubcategory} className="space-y-4">
-          {!editingCategory && (
-            <div className="bg-green-50 text-green-800 text-sm p-3 rounded-lg">
-              Create a <strong>Subcategory</strong> first, then assign it to a Series using drag-drop or the dropdown.
-            </div>
-          )}
-          <Input label="Name" placeholder="e.g., Christology" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} required autoFocus />
+      {/* Subcategory Modal */}
+      <Modal isOpen={showSubcategoryModal} onClose={closeSubcategoryModal} title={editingSubcategory ? "Edit Subcategory" : "New Subcategory"}>
+        <form onSubmit={editingSubcategory ? handleUpdateSubcategory : handleCreateSubcategory} className="space-y-4">
+          <Input label="Name" placeholder="e.g., Christology" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
           <div>
             <label className="label">Description (optional)</label>
-            <textarea value={categoryDescription} onChange={(e) => setCategoryDescription(e.target.value)} placeholder="Brief description..." className="input min-h-[80px]" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description..." className="input min-h-[80px]" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={closeSubcategoryModal}>Cancel</Button>
-            <Button type="submit" loading={saving} disabled={saving}>{editingCategory ? "Update" : "Create Subcategory"}</Button>
+            <Button type="submit" loading={saving} disabled={saving}>{editingSubcategory ? "Update" : "Create"}</Button>
           </div>
         </form>
       </Modal>
@@ -709,27 +646,20 @@ export default function CategoriesPage() {
       {/* Manage Subcategories Modal */}
       <Modal isOpen={showManageModal} onClose={closeManageModal} title={`Manage - ${managingSeries?.name}`}>
         <div className="space-y-4">
-          <div className="bg-blue-50 text-blue-800 text-sm p-3 rounded-lg">
-            Drag to reorder, or use arrows. Use the dropdown to add subcategories.
-          </div>
-
           <div className="flex gap-2">
             <div className="flex-1">
               <Select
                 label="Add subcategory"
                 options={[
-                  { value: "", label: "Select a subcategory to add..." },
-                  ...getAvailableForSeries().map((c) => ({
-                    value: c.id,
-                    label: c.parentId ? `(from another series) ${c.name}` : c.name,
-                  })),
+                  { value: "", label: "Select..." },
+                  ...getAvailableForSeries().map((s) => ({ value: s.id, label: s.name })),
                 ]}
-                value={selectedCategoryToAdd}
-                onChange={(e) => setSelectedCategoryToAdd(e.target.value)}
+                value={selectedSubcategoryToAdd}
+                onChange={(e) => setSelectedSubcategoryToAdd(e.target.value)}
               />
             </div>
             <div className="flex items-end">
-              <Button onClick={handleAddToSeries} disabled={!selectedCategoryToAdd || saving} size="sm">
+              <Button onClick={handleAddToSeries} disabled={!selectedSubcategoryToAdd || saving} size="sm">
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -739,7 +669,7 @@ export default function CategoriesPage() {
             <label className="label">Subcategories ({managedSubcategories.length})</label>
             {managedSubcategories.length === 0 ? (
               <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
-                No subcategories. Use the dropdown above or drag from the Subcategories tab.
+                No subcategories. Use dropdown above.
               </div>
             ) : (
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -750,9 +680,7 @@ export default function CategoriesPage() {
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`flex items-center gap-3 p-3 bg-cream-50 border border-cream-200 rounded-lg cursor-move transition-all ${
-                      draggedIndex === index ? "opacity-50 border-gold-500" : ""
-                    }`}
+                    className={`flex items-center gap-3 p-3 bg-cream-50 border border-cream-200 rounded-lg cursor-move transition-all ${draggedIndex === index ? "opacity-50 border-gold-500" : ""}`}
                   >
                     <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gold-100 text-gold-700 text-sm font-bold flex-shrink-0">
@@ -760,7 +688,6 @@ export default function CategoriesPage() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-charcoal-800">{sub.name}</span>
-                      {sub.description && <p className="text-xs text-gray-500 truncate">{sub.description}</p>}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <Button variant="ghost" size="sm" onClick={() => handleMoveInModal(index, "up")} disabled={index === 0} title="Move up">

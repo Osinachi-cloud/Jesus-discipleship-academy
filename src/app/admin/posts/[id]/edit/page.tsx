@@ -7,12 +7,17 @@ import { Button, Input, Select, Card, CardContent, Alert, Loading } from "@/comp
 import { ArrowLeft, Save, Eye, Trash2 } from "lucide-react";
 import Link from "next/link";
 
-interface Category {
+interface Series {
   id: string;
   name: string;
-  parentId?: string | null;
-  parent?: Category | null;
-  _count?: { children: number };
+  subcategories: Subcategory[];
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  seriesId?: string | null;
+  series?: Series | null;
 }
 
 export default function EditPostPage() {
@@ -20,7 +25,8 @@ export default function EditPostPage() {
   const params = useParams();
   const postId = params.id as string;
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -31,22 +37,27 @@ export default function EditPostPage() {
     excerpt: "",
     featuredImage: "",
     status: "draft",
-    categoryId: "",
+    subcategoryId: "",
     order: "",
   });
 
   useEffect(() => {
-    fetchCategories();
+    fetchData();
     fetchPost();
   }, [postId]);
 
-  const fetchCategories = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch("/api/categories?flat=true");
-      const result = await response.json();
-      setCategories(result.data || []);
+      const [seriesRes, subcategoriesRes] = await Promise.all([
+        fetch("/api/series"),
+        fetch("/api/subcategories"),
+      ]);
+      const seriesData = await seriesRes.json();
+      const subcategoriesData = await subcategoriesRes.json();
+      setSeriesList(seriesData.data || []);
+      setSubcategories(subcategoriesData.data || []);
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.error("Error fetching data:", error);
     }
   };
 
@@ -62,7 +73,7 @@ export default function EditPostPage() {
         excerpt: post.excerpt || "",
         featuredImage: post.featuredImage || "",
         status: post.status,
-        categoryId: post.categoryId || "",
+        subcategoryId: post.subcategoryId || "",
         order: post.order?.toString() || "",
       });
     } catch (error) {
@@ -92,7 +103,7 @@ export default function EditPostPage() {
         body: JSON.stringify({
           ...formData,
           status: status || formData.status,
-          categoryId: formData.categoryId || null,
+          subcategoryId: formData.subcategoryId || null,
           order: formData.order ? parseInt(formData.order) : null,
         }),
       });
@@ -140,10 +151,7 @@ export default function EditPostPage() {
 
       <div className="p-6">
         <div className="mb-6 flex items-center justify-between">
-          <Link
-            href="/admin/posts"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900"
-          >
+          <Link href="/admin/posts" className="inline-flex items-center text-gray-600 hover:text-gray-900">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Posts
           </Link>
@@ -154,9 +162,7 @@ export default function EditPostPage() {
         </div>
 
         {error && (
-          <Alert variant="error" className="mb-6">
-            {error}
-          </Alert>
+          <Alert variant="error" className="mb-6">{error}</Alert>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -168,18 +174,14 @@ export default function EditPostPage() {
                     label="Title"
                     placeholder="Enter post title"
                     value={formData.title}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, title: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                   />
 
                   <div>
                     <label className="label">Content</label>
                     <RichTextEditor
                       content={formData.content}
-                      onChange={(content) =>
-                        setFormData((prev) => ({ ...prev, content }))
-                      }
+                      onChange={(content) => setFormData((prev) => ({ ...prev, content }))}
                     />
                   </div>
 
@@ -187,9 +189,7 @@ export default function EditPostPage() {
                     label="Excerpt"
                     placeholder="Brief summary of the post (optional)"
                     value={formData.excerpt}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, excerpt: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, excerpt: e.target.value }))}
                   />
                 </div>
               </CardContent>
@@ -208,116 +208,63 @@ export default function EditPostPage() {
                       { value: "published", label: "Published" },
                     ]}
                     value={formData.status}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        status: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, status: e.target.value }))}
                   />
 
                   <div>
                     <label className="label">Subcategory</label>
                     <select
                       className="input"
-                      value={formData.categoryId}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          categoryId: e.target.value,
-                        }))
-                      }
+                      value={formData.subcategoryId}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, subcategoryId: e.target.value }))}
                     >
                       <option value="">Select subcategory...</option>
-                      {categories
-                        .filter((c) => !c.parentId && (c._count?.children || 0) > 0)
-                        .map((series) => (
-                          <optgroup key={series.id} label={series.name}>
-                            {categories
-                              .filter((sub) => sub.parentId === series.id)
-                              .map((sub) => (
-                                <option key={sub.id} value={sub.id}>
-                                  {sub.name}
-                                </option>
-                              ))}
-                          </optgroup>
-                        ))}
-                      {categories
-                        .filter((c) => !c.parentId && (c._count?.children || 0) === 0)
-                        .length > 0 && (
-                        <optgroup label="Standalone Categories">
-                          {categories
-                            .filter((c) => !c.parentId && (c._count?.children || 0) === 0)
-                            .map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
+                      {seriesList.map((series) => (
+                        <optgroup key={series.id} label={series.name}>
+                          {series.subcategories.map((sub) => (
+                            <option key={sub.id} value={sub.id}>{sub.name}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                      {subcategories.filter(s => !s.seriesId).length > 0 && (
+                        <optgroup label="Unassigned">
+                          {subcategories.filter(s => !s.seriesId).map((sub) => (
+                            <option key={sub.id} value={sub.id}>{sub.name}</option>
+                          ))}
                         </optgroup>
                       )}
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select the subcategory this post belongs to.
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Select the subcategory for this post.</p>
                   </div>
 
                   <Input
-                    label="Order in Category"
+                    label="Order in Subcategory"
                     type="number"
                     placeholder="e.g., 1, 2, 3..."
                     value={formData.order}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        order: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, order: e.target.value }))}
                   />
-                  <p className="text-xs text-gray-500 -mt-2">
-                    Controls display order within the category. Lower numbers appear first.
-                  </p>
+                  <p className="text-xs text-gray-500 -mt-2">Lower numbers appear first.</p>
 
                   <div className="pt-4 space-y-2">
                     {formData.status === "draft" ? (
                       <>
-                        <Button
-                          onClick={() => handleSubmit("published")}
-                          loading={saving}
-                          disabled={saving}
-                          className="w-full"
-                        >
+                        <Button onClick={() => handleSubmit("published")} loading={saving} disabled={saving} className="w-full">
                           <Eye className="h-4 w-4 mr-2" />
                           Publish
                         </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleSubmit()}
-                          loading={saving}
-                          disabled={saving}
-                          className="w-full"
-                        >
+                        <Button variant="outline" onClick={() => handleSubmit()} loading={saving} disabled={saving} className="w-full">
                           <Save className="h-4 w-4 mr-2" />
                           Save Draft
                         </Button>
                       </>
                     ) : (
                       <>
-                        <Button
-                          onClick={() => handleSubmit()}
-                          loading={saving}
-                          disabled={saving}
-                          className="w-full"
-                        >
+                        <Button onClick={() => handleSubmit()} loading={saving} disabled={saving} className="w-full">
                           <Save className="h-4 w-4 mr-2" />
                           Update
                         </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleSubmit("draft")}
-                          loading={saving}
-                          disabled={saving}
-                          className="w-full"
-                        >
+                        <Button variant="outline" onClick={() => handleSubmit("draft")} loading={saving} disabled={saving} className="w-full">
                           Unpublish
                         </Button>
                       </>
@@ -333,19 +280,10 @@ export default function EditPostPage() {
                 <Input
                   placeholder="Enter image URL"
                   value={formData.featuredImage}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      featuredImage: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, featuredImage: e.target.value }))}
                 />
                 {formData.featuredImage && (
-                  <img
-                    src={formData.featuredImage}
-                    alt="Preview"
-                    className="mt-4 rounded-lg w-full h-40 object-cover"
-                  />
+                  <img src={formData.featuredImage} alt="Preview" className="mt-4 rounded-lg w-full h-40 object-cover" />
                 )}
               </CardContent>
             </Card>
