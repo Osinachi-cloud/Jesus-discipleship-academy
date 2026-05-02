@@ -12,6 +12,7 @@ interface Category {
   name: string;
   parentId?: string | null;
   parent?: Category | null;
+  _count?: { children: number };
 }
 
 export default function EditPostPage() {
@@ -215,23 +216,50 @@ export default function EditPostPage() {
                     }
                   />
 
-                  <Select
-                    label="Category"
-                    options={[
-                      { value: "", label: "Select category" },
-                      ...categories.map((c) => ({
-                        value: c.id,
-                        label: c.parent ? `${c.parent.name} → ${c.name}` : c.name,
-                      })),
-                    ]}
-                    value={formData.categoryId}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        categoryId: e.target.value,
-                      }))
-                    }
-                  />
+                  <div>
+                    <label className="label">Subcategory</label>
+                    <select
+                      className="input"
+                      value={formData.categoryId}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          categoryId: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Select subcategory...</option>
+                      {categories
+                        .filter((c) => !c.parentId && (c._count?.children || 0) > 0)
+                        .map((series) => (
+                          <optgroup key={series.id} label={series.name}>
+                            {categories
+                              .filter((sub) => sub.parentId === series.id)
+                              .map((sub) => (
+                                <option key={sub.id} value={sub.id}>
+                                  {sub.name}
+                                </option>
+                              ))}
+                          </optgroup>
+                        ))}
+                      {categories
+                        .filter((c) => !c.parentId && (c._count?.children || 0) === 0)
+                        .length > 0 && (
+                        <optgroup label="Standalone Categories">
+                          {categories
+                            .filter((c) => !c.parentId && (c._count?.children || 0) === 0)
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select the subcategory this post belongs to.
+                    </p>
+                  </div>
 
                   <Input
                     label="Order in Category"
