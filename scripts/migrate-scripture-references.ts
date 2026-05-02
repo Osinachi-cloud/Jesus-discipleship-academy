@@ -223,16 +223,17 @@ async function processContent(content: string): Promise<{ updated: string; count
     console.log(`  Processing: ${match[0]}`);
     const verseText = await fetchVerseText(ref);
 
-    if (verseText) {
+    if (verseText && match.index !== undefined) {
       const escapedRef = escapeHtml(match[0]);
       const escapedText = escapeHtml(verseText);
 
       const replacement = `<span data-scripture-reference="" class="scripture-reference" data-reference="${escapedRef}" data-verse-text="${escapedText}">${match[0]}</span>`;
 
+      const matchIndex = match.index;
       updatedContent =
-        updatedContent.substring(0, match.index) +
+        updatedContent.substring(0, matchIndex) +
         replacement +
-        updatedContent.substring(match.index + match[0].length);
+        updatedContent.substring(matchIndex + match[0].length);
 
       count++;
 
