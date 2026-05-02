@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AdminSidebar } from "@/components/admin";
+import { ScriptureTooltip } from "@/components/public";
 
 export default function AdminLayout({
   children,
@@ -59,6 +60,7 @@ export default function AdminLayout({
       <main className="lg:pl-64">
         <div className="min-h-screen">{children}</div>
       </main>
+      <ScriptureTooltip />
     </div>
   );
 }

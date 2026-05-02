@@ -17,7 +17,7 @@ export function ScriptureTooltip() {
 
       tooltipRef.current.innerHTML = `
         <div class="scripture-tooltip-header">
-          ${reference}
+          ${reference} (NASB)
         </div>
         <div class="scripture-tooltip-body">
           ${verseText}

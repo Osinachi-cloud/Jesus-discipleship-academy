@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
+import TextStyle from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
 import { Button } from "@/components/ui";
 import {
   Bold,
@@ -23,6 +25,7 @@ import {
   Strikethrough,
   BookOpen,
   X,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -43,9 +46,38 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [showStrikethroughModal, setShowStrikethroughModal] = useState(false);
   const [showScriptureModal, setShowScriptureModal] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const [replacementText, setReplacementText] = useState("");
   const [scriptureReference, setScriptureReference] = useState("");
   const [scriptureVerseText, setScriptureVerseText] = useState("");
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  const colorPalette = [
+    { name: "Black", value: "#000000" },
+    { name: "Dark Gray", value: "#4b5563" },
+    { name: "Gray", value: "#9ca3af" },
+    { name: "Red", value: "#dc2626" },
+    { name: "Orange", value: "#ea580c" },
+    { name: "Amber", value: "#d97706" },
+    { name: "Yellow", value: "#ca8a04" },
+    { name: "Lime", value: "#65a30d" },
+    { name: "Green", value: "#16a34a" },
+    { name: "Emerald", value: "#059669" },
+    { name: "Teal", value: "#0d9488" },
+    { name: "Cyan", value: "#0891b2" },
+    { name: "Sky", value: "#0284c7" },
+    { name: "Blue", value: "#2563eb" },
+    { name: "Indigo", value: "#4f46e5" },
+    { name: "Violet", value: "#7c3aed" },
+    { name: "Purple", value: "#9333ea" },
+    { name: "Fuchsia", value: "#c026d3" },
+    { name: "Pink", value: "#db2777" },
+    { name: "Rose", value: "#e11d48" },
+    { name: "Navy", value: "#1e3a5f" },
+    { name: "Gold", value: "#b8860b" },
+    { name: "Brown", value: "#78350f" },
+    { name: "Maroon", value: "#7f1d1d" },
+  ];
 
   const editor = useEditor({
     extensions: [
@@ -66,6 +98,8 @@ export function RichTextEditor({
         },
       }),
       Underline,
+      TextStyle,
+      Color,
       StrikethroughReplacement,
       ScriptureReference,
     ],
@@ -144,6 +178,16 @@ export function RichTextEditor({
     setShowScriptureModal(false);
     setScriptureReference("");
     setScriptureVerseText("");
+  };
+
+  const applyColor = (color: string) => {
+    editor.chain().focus().setColor(color).run();
+    setShowColorPicker(false);
+  };
+
+  const removeColor = () => {
+    editor.chain().focus().unsetColor().run();
+    setShowColorPicker(false);
   };
 
   const ToolbarButton = ({
@@ -257,6 +301,47 @@ export function RichTextEditor({
         >
           <BookOpen className="h-4 w-4" />
         </ToolbarButton>
+        <div className="relative" ref={colorPickerRef}>
+          <ToolbarButton
+            onClick={() => setShowColorPicker(!showColorPicker)}
+            active={editor.isActive("textStyle")}
+            title="Text Color"
+          >
+            <Palette className="h-4 w-4" />
+          </ToolbarButton>
+          {showColorPicker && (
+            <div className="absolute top-full left-0 mt-1 p-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-64">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-medium text-gray-600">Text Color</span>
+                <button
+                  onClick={removeColor}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Remove color
+                </button>
+              </div>
+              <div className="grid grid-cols-6 gap-1">
+                {colorPalette.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => applyColor(color.value)}
+                    title={color.name}
+                    className="w-8 h-8 rounded border border-gray-200 hover:scale-110 transition-transform"
+                    style={{ backgroundColor: color.value }}
+                  />
+                ))}
+              </div>
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <label className="text-xs text-gray-600 block mb-1">Custom color</label>
+                <input
+                  type="color"
+                  onChange={(e) => applyColor(e.target.value)}
+                  className="w-full h-8 cursor-pointer rounded border border-gray-200"
+                />
+              </div>
+            </div>
+          )}
+        </div>
         <div className="w-px h-6 bg-gray-300 mx-1" />
         <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}
