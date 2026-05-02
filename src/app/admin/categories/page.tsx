@@ -18,8 +18,10 @@ import {
   FolderOpen,
   ChevronRight,
   ChevronDown,
-  GripVertical,
   FolderTree,
+  ArrowUp,
+  ArrowDown,
+  Layers,
 } from "lucide-react";
 
 interface Category {
@@ -29,29 +31,24 @@ interface Category {
   description?: string | null;
   order?: number | null;
   parentId?: string | null;
-  parent?: Category | null;
   children?: Category[];
   _count: {
     posts: number;
-    media: number;
     children?: number;
   };
 }
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [parentCategories, setParentCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showSubModal, setShowSubModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [selectedParent, setSelectedParent] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
-  const [categoryOrder, setCategoryOrder] = useState<string>("");
-  const [parentId, setParentId] = useState<string>("");
   const [saving, setSaving] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set()
-  );
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchCategories();
@@ -60,14 +57,13 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const [hierarchyRes, parentsRes] = await Promise.all([
-        fetch("/api/categories"),
-        fetch("/api/categories?parentOnly=true"),
-      ]);
-      const hierarchyData = await hierarchyRes.json();
-      const parentsData = await parentsRes.json();
-      setCategories(hierarchyData.data || []);
-      setParentCategories(parentsData.data || []);
+      const response = await fetch("/api/categories");
+      const result = await response.json();
+      setCategories(result.data || []);
+      // Auto-expand all categories
+      const allIds = new Set<string>();
+      (result.data || []).forEach((cat: Category) => allIds.add(cat.id));
+      setExpandedCategories(allIds);
     } catch (error) {
       console.error("Error fetching categories:", error);
     } finally {
@@ -85,40 +81,114 @@ export default function CategoriesPage() {
     setExpandedCategories(newExpanded);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Create new series
+  const handleCreateSeries = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!categoryName.trim()) return;
-
     setSaving(true);
 
     try {
-      const payload = {
-        name: categoryName,
-        description: categoryDescription || null,
-        order: categoryOrder ? parseInt(categoryOrder) : null,
-        parentId: parentId || null,
-      };
-
-      if (editingCategory) {
-        await fetch(`/api/categories/${editingCategory.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        await fetch("/api/categories", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      }
-
+      const maxOrder = categories.reduce((max, c) => Math.max(max, c.order || 0), 0);
+      await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: categoryName,
+          description: categoryDescription || null,
+          order: maxOrder + 1,
+          parentId: null,
+        }),
+      });
       closeModal();
       fetchCategories();
     } catch (error) {
-      console.error("Error saving category:", error);
+      console.error("Error creating series:", error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Create sub-category under a parent
+  const handleCreateSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryName.trim() || !selectedParent) return;
+    setSaving(true);
+
+    try {
+      const siblings = selectedParent.children || [];
+      const maxOrder = siblings.reduce((max, c) => Math.max(max, c.order || 0), 0);
+      await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: categoryName,
+          description: categoryDescription || null,
+          order: maxOrder + 1,
+          parentId: selectedParent.id,
+        }),
+      });
+      closeSubModal();
+      fetchCategories();
+    } catch (error) {
+      console.error("Error creating sub-category:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Update category
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryName.trim() || !editingCategory) return;
+    setSaving(true);
+
+    try {
+      await fetch(`/api/categories/${editingCategory.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: categoryName,
+          description: categoryDescription || null,
+        }),
+      });
+      closeModal();
+      fetchCategories();
+    } catch (error) {
+      console.error("Error updating category:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Move category up/down
+  const handleMove = async (category: Category, direction: "up" | "down", siblings: Category[]) => {
+    const currentIndex = siblings.findIndex(c => c.id === category.id);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+
+    const targetCategory = siblings[targetIndex];
+
+    // Swap orders
+    const currentOrder = category.order ?? currentIndex;
+    const targetOrder = targetCategory.order ?? targetIndex;
+
+    try {
+      await Promise.all([
+        fetch(`/api/categories/${category.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: category.name, order: targetOrder }),
+        }),
+        fetch(`/api/categories/${targetCategory.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: targetCategory.name, order: currentOrder }),
+        }),
+      ]);
+      fetchCategories();
+    } catch (error) {
+      console.error("Error moving category:", error);
     }
   };
 
@@ -126,22 +196,18 @@ export default function CategoriesPage() {
     setEditingCategory(category);
     setCategoryName(category.name);
     setCategoryDescription(category.description || "");
-    setCategoryOrder(category.order?.toString() || "");
-    setParentId(category.parentId || "");
     setShowModal(true);
   };
 
   const handleAddSubcategory = (parent: Category) => {
-    setEditingCategory(null);
+    setSelectedParent(parent);
     setCategoryName("");
     setCategoryDescription("");
-    setCategoryOrder("");
-    setParentId(parent.id);
-    setShowModal(true);
+    setShowSubModal(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this category?")) return;
+    if (!confirm("Are you sure you want to delete this category? All sub-categories will also be deleted.")) return;
 
     try {
       await fetch(`/api/categories/${id}`, { method: "DELETE" });
@@ -155,111 +221,175 @@ export default function CategoriesPage() {
     setShowModal(false);
     setCategoryName("");
     setCategoryDescription("");
-    setCategoryOrder("");
-    setParentId("");
     setEditingCategory(null);
   };
 
-  const renderCategory = (category: Category, level: number = 0) => {
-    const hasChildren = category.children && category.children.length > 0;
-    const isExpanded = expandedCategories.has(category.id);
-    const isParent = !category.parentId;
+  const closeSubModal = () => {
+    setShowSubModal(false);
+    setCategoryName("");
+    setCategoryDescription("");
+    setSelectedParent(null);
+  };
+
+  const renderSubcategory = (category: Category, index: number, siblings: Category[]) => {
+    return (
+      <div
+        key={category.id}
+        className="flex items-center gap-3 py-3 px-4 bg-cream-50 border-b border-cream-200 last:border-b-0"
+      >
+        <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gold-100 text-gold-700 text-sm font-bold">
+          {category.order ?? index + 1}
+        </span>
+        <FolderOpen className="h-4 w-4 text-gold-600 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <span className="font-medium text-charcoal-800">{category.name}</span>
+          {category.description && (
+            <p className="text-xs text-gray-500 truncate">{category.description}</p>
+          )}
+        </div>
+        <span className="text-sm text-gray-500 flex-shrink-0">
+          {category._count.posts} posts
+        </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleMove(category, "up", siblings)}
+            disabled={index === 0}
+            title="Move up"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleMove(category, "down", siblings)}
+            disabled={index === siblings.length - 1}
+            title="Move down"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEdit(category)}
+            title="Edit"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDelete(category.id)}
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSeries = (series: Category, index: number) => {
+    const hasChildren = series.children && series.children.length > 0;
+    const isExpanded = expandedCategories.has(series.id);
 
     return (
-      <div key={category.id}>
-        <div
-          className={`flex items-center hover:bg-gray-50 border-b ${
-            level > 0 ? "bg-gray-50/50" : ""
-          }`}
-          style={{ paddingLeft: `${level * 24 + 16}px` }}
-        >
-          <div className="flex items-center flex-1 py-3">
-            {hasChildren ? (
+      <div key={series.id} className="border border-cream-300 rounded-lg overflow-hidden mb-4">
+        <div className="bg-navy-800 text-cream-100 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-navy-700 text-gold-500 font-bold">
+              {series.order ?? index + 1}
+            </span>
+            {hasChildren && (
               <button
-                onClick={() => toggleExpand(category.id)}
-                className="p-1 hover:bg-gray-200 rounded mr-2"
+                onClick={() => toggleExpand(series.id)}
+                className="p-1 hover:bg-navy-700 rounded"
               >
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className="h-5 w-5" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                  <ChevronRight className="h-5 w-5" />
                 )}
               </button>
-            ) : (
-              <span className="w-7" />
             )}
-
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                {isParent ? (
-                  <FolderTree className="h-4 w-4 text-navy-600" />
-                ) : (
-                  <FolderOpen className="h-4 w-4 text-gold-600" />
-                )}
-                <span
-                  className={`font-medium ${
-                    isParent ? "text-navy-800" : "text-gray-700"
-                  }`}
-                >
-                  {category.order !== null && category.order !== undefined && (
-                    <span className="text-xs bg-navy-100 text-navy-700 px-1.5 py-0.5 rounded mr-2">
-                      #{category.order}
-                    </span>
-                  )}
-                  {category.name}
-                </span>
-                {isParent && category._count.children !== undefined && category._count.children > 0 && (
-                  <span className="text-xs text-gray-400">
-                    ({category._count.children} sub-categories)
-                  </span>
-                )}
-              </div>
-              {category.description && (
-                <p className="text-xs text-gray-500 mt-0.5 ml-6">
-                  {category.description}
-                </p>
+            <FolderTree className="h-5 w-5 text-gold-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold text-lg">{series.name}</span>
+              {series.description && (
+                <p className="text-sm text-cream-300 truncate">{series.description}</p>
               )}
             </div>
-          </div>
-
-          <div className="flex items-center gap-4 px-4">
-            <span className="text-sm text-gray-500">
-              {category._count.posts} posts
-            </span>
-            <div className="flex items-center gap-1">
-              {isParent && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleAddSubcategory(category)}
-                  title="Add sub-category"
-                >
-                  <Plus className="h-4 w-4 text-green-600" />
-                </Button>
-              )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-sm text-cream-300">
+                {series._count.children || 0} topics
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleEdit(category)}
+                onClick={() => handleMove(series, "up", categories)}
+                disabled={index === 0}
+                title="Move up"
+                className="text-cream-200 hover:text-white hover:bg-navy-700"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleMove(series, "down", categories)}
+                disabled={index === categories.length - 1}
+                title="Move down"
+                className="text-cream-200 hover:text-white hover:bg-navy-700"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEdit(series)}
                 title="Edit"
+                className="text-cream-200 hover:text-white hover:bg-navy-700"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleDelete(category.id)}
+                onClick={() => handleDelete(series.id)}
                 title="Delete"
+                className="text-red-400 hover:text-red-300 hover:bg-navy-700"
               >
-                <Trash2 className="h-4 w-4 text-red-500" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </div>
 
-        {hasChildren && isExpanded && (
-          <div>
-            {category.children!.map((child) => renderCategory(child, level + 1))}
+        {isExpanded && (
+          <div className="bg-white">
+            {hasChildren ? (
+              <div>
+                {series.children!.map((child, idx) =>
+                  renderSubcategory(child, idx, series.children!)
+                )}
+              </div>
+            ) : (
+              <div className="py-6 text-center text-gray-500">
+                No sub-categories yet
+              </div>
+            )}
+            <div className="p-3 bg-gray-50 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddSubcategory(series)}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Sub-category to {series.name}
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -268,95 +398,67 @@ export default function CategoriesPage() {
 
   return (
     <div>
-      <AdminHeader title="Categories & Series" />
+      <AdminHeader title="Series & Categories" />
 
       <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <p className="text-gray-600">
-            Organize content into series (parent categories) and topics (sub-categories).
-          </p>
+        <div className="flex justify-between items-start gap-4">
+          <div>
+            <p className="text-gray-600 mb-2">
+              Organize your content into <strong>Series</strong> (main topics) and <strong>Sub-categories</strong> (lessons within each series).
+            </p>
+            <p className="text-sm text-gray-500">
+              Use the arrows to reorder. Numbers indicate the display order for readers.
+            </p>
+          </div>
           <Button onClick={() => setShowModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Series
           </Button>
         </div>
 
-        <Card>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="py-12">
-                <Loading />
-              </div>
-            ) : categories.length === 0 ? (
+        {loading ? (
+          <div className="py-12">
+            <Loading />
+          </div>
+        ) : categories.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
               <Empty
-                title="No categories yet"
-                description="Create series to organize your content into learning paths."
-                icon={<FolderTree className="h-12 w-12" />}
+                title="No series yet"
+                description="Create your first series to start organizing content."
+                icon={<Layers className="h-12 w-12" />}
                 action={
                   <Button onClick={() => setShowModal(true)}>
                     <Plus className="h-4 w-4 mr-2" />
-                    New Series
+                    Create First Series
                   </Button>
                 }
               />
-            ) : (
-              <div>
-                <div className="flex items-center px-6 py-3 bg-gray-100 border-b text-sm font-medium text-gray-500">
-                  <span className="flex-1">Category / Series</span>
-                  <span className="w-24 text-center">Posts</span>
-                  <span className="w-32 text-center">Actions</span>
-                </div>
-                {categories.map((category) => renderCategory(category))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <div>
+            {categories.map((series, index) => renderSeries(series, index))}
+          </div>
+        )}
       </div>
 
+      {/* Create/Edit Series Modal */}
       <Modal
         isOpen={showModal}
         onClose={closeModal}
-        title={
-          editingCategory
-            ? "Edit Category"
-            : parentId
-            ? "New Sub-category"
-            : "New Series"
-        }
+        title={editingCategory ? "Edit Category" : "New Series"}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {parentCategories.length > 0 && (
-            <div>
-              <label className="label">Parent Series (optional)</label>
-              <select
-                value={parentId}
-                onChange={(e) => setParentId(e.target.value)}
-                className="input"
-              >
-                <option value="">-- No Parent (Top-level Series) --</option>
-                {parentCategories
-                  .filter((p) => p.id !== editingCategory?.id)
-                  .map((parent) => (
-                    <option key={parent.id} value={parent.id}>
-                      {parent.name}
-                    </option>
-                  ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Select a parent to make this a sub-category under that series.
-              </p>
-            </div>
-          )}
-
-          {!editingCategory && !parentId && parentCategories.length === 0 && (
+        <form onSubmit={editingCategory ? handleUpdateCategory : handleCreateSeries} className="space-y-4">
+          {!editingCategory && (
             <div className="bg-blue-50 text-blue-800 text-sm p-3 rounded-lg">
-              Create your first <strong>Series</strong> to organize your content (e.g., "Discipleship").
+              A <strong>Series</strong> groups related sub-categories together (e.g., "Discipleship" containing "Christology", "Theology").
             </div>
           )}
 
           <Input
             label="Name"
-            placeholder={parentId ? "e.g., Christology" : "e.g., Discipleship"}
+            placeholder="e.g., Discipleship"
             value={categoryName}
             onChange={(e) => setCategoryName(e.target.value)}
             required
@@ -367,28 +469,58 @@ export default function CategoriesPage() {
             <textarea
               value={categoryDescription}
               onChange={(e) => setCategoryDescription(e.target.value)}
-              placeholder="Brief description of this category..."
+              placeholder="Brief description..."
               className="input min-h-[80px]"
             />
           </div>
-
-          <Input
-            label="Order (optional)"
-            type="number"
-            placeholder="e.g., 1, 2, 3..."
-            value={categoryOrder}
-            onChange={(e) => setCategoryOrder(e.target.value)}
-          />
-          <p className="text-xs text-gray-500 -mt-2">
-            Use numbers to control the display order. Lower numbers appear first.
-          </p>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={closeModal}>
               Cancel
             </Button>
             <Button type="submit" loading={saving} disabled={saving}>
-              {editingCategory ? "Update" : "Create"}
+              {editingCategory ? "Update" : "Create Series"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Sub-category Modal */}
+      <Modal
+        isOpen={showSubModal}
+        onClose={closeSubModal}
+        title={`Add Sub-category to "${selectedParent?.name}"`}
+      >
+        <form onSubmit={handleCreateSubcategory} className="space-y-4">
+          <div className="bg-green-50 text-green-800 text-sm p-3 rounded-lg">
+            This sub-category will be added to <strong>{selectedParent?.name}</strong> series.
+          </div>
+
+          <Input
+            label="Name"
+            placeholder="e.g., Christology"
+            value={categoryName}
+            onChange={(e) => setCategoryName(e.target.value)}
+            required
+            autoFocus
+          />
+
+          <div>
+            <label className="label">Description (optional)</label>
+            <textarea
+              value={categoryDescription}
+              onChange={(e) => setCategoryDescription(e.target.value)}
+              placeholder="Brief description..."
+              className="input min-h-[80px]"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={closeSubModal}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={saving} disabled={saving}>
+              Add Sub-category
             </Button>
           </div>
         </form>
