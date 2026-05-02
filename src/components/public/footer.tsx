@@ -103,6 +103,22 @@ export function Footer() {
         </div>
 
         <div className="border-t border-navy-700 mt-8 pt-8">
+          <div className="text-center mb-8">
+            <p className="text-gold-500 font-serif text-lg md:text-xl italic tracking-wide">
+              <span className="inline-block">By Him</span>
+              <span className="mx-2 text-cream-400">·</span>
+              <span className="inline-block">through Him</span>
+              <span className="mx-2 text-cream-400">·</span>
+              <span className="inline-block">in Him</span>
+              <span className="mx-2 text-cream-400">·</span>
+              <span className="inline-block">for Him</span>
+              <span className="mx-2 text-cream-400">·</span>
+              <span className="inline-block">unto Him</span>
+            </p>
+            <p className="text-cream-400 text-xs mt-2 tracking-widest uppercase">
+              Romans 11:36 &bull; Colossians 1:16
+            </p>
+          </div>
           <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
             <a
               href="tel:+2348167144768"
