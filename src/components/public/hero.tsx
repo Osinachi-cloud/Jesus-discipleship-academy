@@ -18,6 +18,15 @@ export function Hero() {
             <span className="text-gold-500">Walking in Truth</span>
           </h1>
 
+          <div className="mb-8">
+            <p className="text-gold-400 font-serif text-xl md:text-2xl italic tracking-wide mb-2">
+              By Him · through Him · in Him · for Him · unto Him
+            </p>
+            <p className="text-cream-300/70 text-sm tracking-wider">
+              Romans 11:36 • Colossians 1:16
+            </p>
+          </div>
+
           <p className="text-lg md:text-xl text-cream-200 mb-8 max-w-2xl mx-auto">
             Welcome to Jesus Discipleship Academy. Discover biblical teachings,
             discipleship resources, and spiritual growth materials to deepen
