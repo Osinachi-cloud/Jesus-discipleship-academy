@@ -82,9 +82,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if name already exists
+    const existingName = await prisma.category.findUnique({ where: { name } });
+    if (existingName) {
+      return NextResponse.json(
+        { error: `A category with the name "${name}" already exists` },
+        { status: 400 }
+      );
+    }
+
     let slug = slugify(name);
-    const existing = await prisma.category.findUnique({ where: { slug } });
-    if (existing) {
+    const existingSlug = await prisma.category.findUnique({ where: { slug } });
+    if (existingSlug) {
       slug = `${slug}-${Date.now()}`;
     }
 
@@ -99,10 +108,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ data: category }, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error creating category:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to create category" },
+      { error: "Failed to create category", details: message },
       { status: 500 }
     );
   }
