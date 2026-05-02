@@ -10,6 +10,7 @@ import {
   Empty,
   Input,
   Modal,
+  Select,
 } from "@/components/ui";
 import {
   Plus,
@@ -22,6 +23,8 @@ import {
   ArrowUp,
   ArrowDown,
   Layers,
+  GripVertical,
+  X,
 } from "lucide-react";
 
 interface Category {
@@ -38,17 +41,29 @@ interface Category {
   };
 }
 
+interface FlatCategory {
+  id: string;
+  name: string;
+  parentId?: string | null;
+}
+
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [allCategories, setAllCategories] = useState<FlatCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
+  const [showManageSubsModal, setShowManageSubsModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [managingSeries, setManagingSeries] = useState<Category | null>(null);
   const [selectedParent, setSelectedParent] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [selectedCategoryToAdd, setSelectedCategoryToAdd] = useState("");
+  const [managedSubcategories, setManagedSubcategories] = useState<Category[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -57,12 +72,17 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/categories");
-      const result = await response.json();
-      setCategories(result.data || []);
+      const [hierarchyRes, flatRes] = await Promise.all([
+        fetch("/api/categories"),
+        fetch("/api/categories?flat=true"),
+      ]);
+      const hierarchyResult = await hierarchyRes.json();
+      const flatResult = await flatRes.json();
+      setCategories(hierarchyResult.data || []);
+      setAllCategories(flatResult.data || []);
       // Auto-expand all categories
       const allIds = new Set<string>();
-      (result.data || []).forEach((cat: Category) => allIds.add(cat.id));
+      (hierarchyResult.data || []).forEach((cat: Category) => allIds.add(cat.id));
       setExpandedCategories(allIds);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -231,6 +251,138 @@ export default function CategoriesPage() {
     setSelectedParent(null);
   };
 
+  // Open manage subcategories modal
+  const handleManageSubcategories = (series: Category) => {
+    setManagingSeries(series);
+    setManagedSubcategories([...(series.children || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+    setSelectedCategoryToAdd("");
+    setShowManageSubsModal(true);
+  };
+
+  const closeManageSubsModal = () => {
+    setShowManageSubsModal(false);
+    setManagingSeries(null);
+    setManagedSubcategories([]);
+    setSelectedCategoryToAdd("");
+    setDraggedIndex(null);
+  };
+
+  // Get categories that can be added as subcategories (orphans or from other series)
+  const getAvailableCategories = () => {
+    if (!managingSeries) return [];
+    const currentSubIds = new Set(managedSubcategories.map(c => c.id));
+    return allCategories.filter(c =>
+      c.id !== managingSeries.id &&
+      !currentSubIds.has(c.id) &&
+      c.parentId !== managingSeries.id
+    );
+  };
+
+  // Add a category as subcategory
+  const handleAddToSeries = async () => {
+    if (!selectedCategoryToAdd || !managingSeries) return;
+    setSaving(true);
+    try {
+      const newOrder = managedSubcategories.length + 1;
+      await fetch(`/api/categories/${selectedCategoryToAdd}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parentId: managingSeries.id,
+          order: newOrder
+        }),
+      });
+      // Refresh and update local state
+      const catToAdd = allCategories.find(c => c.id === selectedCategoryToAdd);
+      if (catToAdd) {
+        setManagedSubcategories(prev => [...prev, {
+          ...catToAdd,
+          order: newOrder,
+          _count: { posts: 0 }
+        } as Category]);
+      }
+      setSelectedCategoryToAdd("");
+      fetchCategories();
+    } catch (error) {
+      console.error("Error adding subcategory:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Remove from series (make it a top-level category)
+  const handleRemoveFromSeries = async (categoryId: string) => {
+    if (!confirm("Remove this subcategory from the series? It will become a standalone series.")) return;
+    setSaving(true);
+    try {
+      await fetch(`/api/categories/${categoryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentId: null }),
+      });
+      setManagedSubcategories(prev => prev.filter(c => c.id !== categoryId));
+      fetchCategories();
+    } catch (error) {
+      console.error("Error removing subcategory:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newList = [...managedSubcategories];
+    const draggedItem = newList[draggedIndex];
+    newList.splice(draggedIndex, 1);
+    newList.splice(index, 0, draggedItem);
+    setManagedSubcategories(newList);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  // Save the new order
+  const handleSaveOrder = async () => {
+    if (!managingSeries) return;
+    setSaving(true);
+    try {
+      await Promise.all(
+        managedSubcategories.map((cat, index) =>
+          fetch(`/api/categories/${cat.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order: index + 1 }),
+          })
+        )
+      );
+      closeManageSubsModal();
+      fetchCategories();
+    } catch (error) {
+      console.error("Error saving order:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Move subcategory up/down in the manage modal
+  const handleMoveInModal = (index: number, direction: "up" | "down") => {
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= managedSubcategories.length) return;
+
+    const newList = [...managedSubcategories];
+    [newList[index], newList[newIndex]] = [newList[newIndex], newList[index]];
+    setManagedSubcategories(newList);
+  };
+
   const renderSubcategory = (category: Category, index: number, siblings: Category[]) => {
     return (
       <div
@@ -324,6 +476,15 @@ export default function CategoriesPage() {
               <span className="text-sm text-cream-300">
                 {series._count.children || 0} topics
               </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleManageSubcategories(series)}
+                title="Manage Subcategories"
+                className="text-gold-400 hover:text-gold-300 hover:bg-navy-700"
+              >
+                <Layers className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -524,6 +685,132 @@ export default function CategoriesPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Manage Subcategories Modal */}
+      <Modal
+        isOpen={showManageSubsModal}
+        onClose={closeManageSubsModal}
+        title={`Manage Subcategories - ${managingSeries?.name}`}
+      >
+        <div className="space-y-4">
+          <div className="bg-blue-50 text-blue-800 text-sm p-3 rounded-lg">
+            Drag to reorder subcategories, or use the arrows. Use the dropdown to add existing categories.
+          </div>
+
+          {/* Add existing category dropdown */}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Select
+                label="Add existing category"
+                options={[
+                  { value: "", label: "Select a category to add..." },
+                  ...getAvailableCategories().map((c) => ({
+                    value: c.id,
+                    label: c.parentId
+                      ? `${allCategories.find(p => p.id === c.parentId)?.name} → ${c.name}`
+                      : c.name,
+                  })),
+                ]}
+                value={selectedCategoryToAdd}
+                onChange={(e) => setSelectedCategoryToAdd(e.target.value)}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={handleAddToSeries}
+                disabled={!selectedCategoryToAdd || saving}
+                size="sm"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="label mb-0">Subcategories ({managedSubcategories.length})</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddSubcategory(managingSeries!)}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create New
+              </Button>
+            </div>
+
+            {managedSubcategories.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
+                No subcategories yet. Add existing categories above or create new ones.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {managedSubcategories.map((sub, index) => (
+                  <div
+                    key={sub.id}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className={`flex items-center gap-3 p-3 bg-cream-50 border border-cream-200 rounded-lg cursor-move transition-all ${
+                      draggedIndex === index ? "opacity-50 border-gold-500" : ""
+                    }`}
+                  >
+                    <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gold-100 text-gold-700 text-sm font-bold flex-shrink-0">
+                      {index + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-charcoal-800">{sub.name}</span>
+                      {sub.description && (
+                        <p className="text-xs text-gray-500 truncate">{sub.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleMoveInModal(index, "up")}
+                        disabled={index === 0}
+                        title="Move up"
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleMoveInModal(index, "down")}
+                        disabled={index === managedSubcategories.length - 1}
+                        title="Move down"
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveFromSeries(sub.id)}
+                        title="Remove from series"
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={closeManageSubsModal}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveOrder} loading={saving} disabled={saving}>
+              Save Order
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

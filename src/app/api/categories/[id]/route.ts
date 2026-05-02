@@ -18,13 +18,6 @@ export async function PUT(
     const body = await request.json();
     const { name, parentId, description, order } = body;
 
-    if (!name) {
-      return NextResponse.json(
-        { error: "Category name is required" },
-        { status: 400 }
-      );
-    }
-
     const existing = await prisma.category.findUnique({
       where: { id: params.id },
     });
@@ -37,7 +30,8 @@ export async function PUT(
     }
 
     let slug = existing.slug;
-    if (name !== existing.name) {
+    const updatedName = name || existing.name;
+    if (name && name !== existing.name) {
       slug = slugify(name);
       const slugExists = await prisma.category.findFirst({
         where: { slug, id: { not: params.id } },
@@ -50,7 +44,7 @@ export async function PUT(
     const category = await prisma.category.update({
       where: { id: params.id },
       data: {
-        name,
+        name: updatedName,
         slug,
         description: description !== undefined ? description : existing.description,
         order: order !== undefined ? order : existing.order,
