@@ -48,7 +48,7 @@ interface FlatCategory {
   slug: string;
   description?: string | null;
   parentId?: string | null;
-  _count?: { posts: number };
+  _count?: { posts: number; children?: number };
 }
 
 export default function CategoriesPage() {
@@ -104,13 +104,14 @@ export default function CategoriesPage() {
     setExpandedCategories(newExpanded);
   };
 
-  // Get unassigned subcategories (categories with a parentId that points to a non-existent parent, or standalone non-series)
+  // Get unassigned subcategories - categories with no parent AND no children (not a series)
   const getUnassignedSubcategories = () => {
-    const seriesIds = new Set(categories.map(c => c.id));
     return allCategories.filter(c => {
-      // Has no parent and has no children = standalone subcategory
-      const isStandaloneSubcategory = !c.parentId && !categories.find(s => s.id === c.id);
-      return isStandaloneSubcategory;
+      // No parent = top-level
+      // No children = not a series (series have children)
+      const hasNoParent = !c.parentId;
+      const hasNoChildren = !c._count?.children || c._count.children === 0;
+      return hasNoParent && hasNoChildren;
     });
   };
 
