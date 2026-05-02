@@ -16,7 +16,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name } = body;
+    const { name, parentId, description, order } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -49,7 +49,13 @@ export async function PUT(
 
     const category = await prisma.category.update({
       where: { id: params.id },
-      data: { name, slug },
+      data: {
+        name,
+        slug,
+        description: description !== undefined ? description : existing.description,
+        order: order !== undefined ? order : existing.order,
+        parentId: parentId !== undefined ? (parentId || null) : existing.parentId,
+      },
     });
 
     return NextResponse.json({ data: category });

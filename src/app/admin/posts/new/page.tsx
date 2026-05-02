@@ -10,6 +10,8 @@ import Link from "next/link";
 interface Category {
   id: string;
   name: string;
+  parentId?: string | null;
+  parent?: Category | null;
 }
 
 export default function NewPostPage() {
@@ -25,6 +27,7 @@ export default function NewPostPage() {
     featuredImage: "",
     status: "draft",
     categoryId: "",
+    order: "",
   });
 
   useEffect(() => {
@@ -33,7 +36,7 @@ export default function NewPostPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/categories");
+      const response = await fetch("/api/categories?flat=true");
       const result = await response.json();
       setCategories(result.data || []);
     } catch (error) {
@@ -62,6 +65,7 @@ export default function NewPostPage() {
           ...formData,
           status,
           categoryId: formData.categoryId || null,
+          order: formData.order ? parseInt(formData.order) : null,
         }),
       });
 
@@ -146,7 +150,10 @@ export default function NewPostPage() {
                     label="Category"
                     options={[
                       { value: "", label: "Select category" },
-                      ...categories.map((c) => ({ value: c.id, label: c.name })),
+                      ...categories.map((c) => ({
+                        value: c.id,
+                        label: c.parent ? `${c.parent.name} → ${c.name}` : c.name,
+                      })),
                     ]}
                     value={formData.categoryId}
                     onChange={(e) =>
@@ -156,6 +163,22 @@ export default function NewPostPage() {
                       }))
                     }
                   />
+
+                  <Input
+                    label="Order in Category"
+                    type="number"
+                    placeholder="e.g., 1, 2, 3..."
+                    value={formData.order}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        order: e.target.value,
+                      }))
+                    }
+                  />
+                  <p className="text-xs text-gray-500 -mt-2">
+                    Controls display order within the category. Lower numbers appear first.
+                  </p>
 
                   <div className="pt-4 space-y-2">
                     <Button

@@ -4,15 +4,54 @@ import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { slugify } from "@/lib/utils";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const parentOnly = searchParams.get("parentOnly") === "true";
+    const flat = searchParams.get("flat") === "true";
+
+    if (parentOnly) {
+      const categories = await prisma.category.findMany({
+        where: { parentId: null },
+        include: {
+          _count: {
+            select: { posts: true, media: true, children: true },
+          },
+        },
+        orderBy: [{ order: "asc" }, { name: "asc" }],
+      });
+      return NextResponse.json({ data: categories });
+    }
+
+    if (flat) {
+      const categories = await prisma.category.findMany({
+        include: {
+          parent: true,
+          _count: {
+            select: { posts: true, media: true, children: true },
+          },
+        },
+        orderBy: [{ order: "asc" }, { name: "asc" }],
+      });
+      return NextResponse.json({ data: categories });
+    }
+
     const categories = await prisma.category.findMany({
+      where: { parentId: null },
       include: {
+        children: {
+          include: {
+            _count: {
+              select: { posts: true, media: true },
+            },
+          },
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+        },
         _count: {
-          select: { posts: true, media: true },
+          select: { posts: true, media: true, children: true },
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: [{ order: "asc" }, { name: "asc" }],
     });
 
     return NextResponse.json({ data: categories });
@@ -34,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name } = body;
+    const { name, parentId, description, order } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -50,7 +89,13 @@ export async function POST(request: NextRequest) {
     }
 
     const category = await prisma.category.create({
-      data: { name, slug },
+      data: {
+        name,
+        slug,
+        description,
+        order: order ?? null,
+        parentId: parentId || null,
+      },
     });
 
     return NextResponse.json({ data: category }, { status: 201 });

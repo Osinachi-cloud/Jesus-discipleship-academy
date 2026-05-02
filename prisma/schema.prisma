@@ -28,6 +28,7 @@ model Post {
   featuredImage String?
   status        String    @default("draft")
   views         Int       @default(0)
+  order         Int?      // Optional ordering within category
   categoryId    String?
   category      Category? @relation(fields: [categoryId], references: [id])
   comments      Comment[]
@@ -37,12 +38,17 @@ model Post {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  posts     Post[]
-  media     Media[]
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?    // Optional description for series/categories
+  order       Int?       // Optional ordering within parent
+  parentId    String?    // Self-reference for hierarchy
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  createdAt   DateTime   @default(now())
+  posts       Post[]
+  media       Media[]
 }
 
 model Comment {

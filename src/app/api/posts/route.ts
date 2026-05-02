@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, content, excerpt, featuredImage, status, categoryId } = body;
+    const { title, content, excerpt, featuredImage, status, categoryId, order } = body;
 
     if (!title || !content) {
       return NextResponse.json(
@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
         featuredImage,
         status: status || "draft",
         categoryId: categoryId || null,
+        order: order ?? null,
         publishedAt: status === "published" ? new Date() : null,
       },
       include: {
