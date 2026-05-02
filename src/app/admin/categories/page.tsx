@@ -325,21 +325,15 @@ export default function CategoriesPage() {
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!editingCategory && !parentId && (
-            <div className="bg-blue-50 text-blue-800 text-sm p-3 rounded-lg">
-              A <strong>Series</strong> is a top-level category that groups related topics together (e.g., "Discipleship", "Daily Posts").
-            </div>
-          )}
-
-          {(parentId || editingCategory?.parentId) && (
+          {parentCategories.length > 0 && (
             <div>
-              <label className="label">Parent Series</label>
+              <label className="label">Parent Series (optional)</label>
               <select
-                value={parentId || editingCategory?.parentId || ""}
+                value={parentId}
                 onChange={(e) => setParentId(e.target.value)}
                 className="input"
               >
-                <option value="">-- No Parent (Make it a Series) --</option>
+                <option value="">-- No Parent (Top-level Series) --</option>
                 {parentCategories
                   .filter((p) => p.id !== editingCategory?.id)
                   .map((parent) => (
@@ -348,6 +342,15 @@ export default function CategoriesPage() {
                     </option>
                   ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select a parent to make this a sub-category under that series.
+              </p>
+            </div>
+          )}
+
+          {!editingCategory && !parentId && parentCategories.length === 0 && (
+            <div className="bg-blue-50 text-blue-800 text-sm p-3 rounded-lg">
+              Create your first <strong>Series</strong> to organize your content (e.g., "Discipleship").
             </div>
           )}
 
