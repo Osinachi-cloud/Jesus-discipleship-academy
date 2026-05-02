@@ -18,7 +18,7 @@ async function getPost(slug: string) {
   const post = await prisma.post.findUnique({
     where: { slug, status: "published" },
     include: {
-      category: true,
+      subcategory: { include: { series: true } },
       comments: {
         where: { approved: true },
         orderBy: { createdAt: "desc" },
@@ -29,13 +29,13 @@ async function getPost(slug: string) {
   return post;
 }
 
-async function getRelatedPosts(categoryId: string | null, currentId: string) {
-  if (!categoryId) return [];
+async function getRelatedPosts(subcategoryId: string | null, currentId: string) {
+  if (!subcategoryId) return [];
 
   return prisma.post.findMany({
     where: {
       status: "published",
-      categoryId,
+      subcategoryId,
       id: { not: currentId },
     },
     select: {
@@ -70,7 +70,7 @@ export default async function PostPage({ params }: PostPageProps) {
     notFound();
   }
 
-  const relatedPosts = await getRelatedPosts(post.categoryId, post.id);
+  const relatedPosts = await getRelatedPosts(post.subcategoryId, post.id);
 
   return (
     <article className="py-12">
@@ -85,10 +85,12 @@ export default async function PostPage({ params }: PostPageProps) {
           </Link>
 
           <header className="mb-8">
-            {post.category && (
-              <Link href={`/categories/${post.category.slug}`}>
+            {post.subcategory && (
+              <Link href={`/series`}>
                 <Badge variant="info" className="mb-4">
-                  {post.category.name}
+                  {post.subcategory.series
+                    ? `${post.subcategory.series.name} / ${post.subcategory.name}`
+                    : post.subcategory.name}
                 </Badge>
               </Link>
             )}
@@ -130,7 +132,7 @@ export default async function PostPage({ params }: PostPageProps) {
               <p className="text-sm text-charcoal-500">
                 Share this article
               </p>
-<ShareButton title={post.title} />
+              <ShareButton title={post.title} />
             </div>
           </div>
 

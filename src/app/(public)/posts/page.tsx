@@ -6,22 +6,22 @@ import { Badge, Button } from "@/components/ui";
 import prisma from "@/lib/prisma";
 
 interface PostsPageProps {
-  searchParams: { page?: string; category?: string };
+  searchParams: { page?: string; subcategory?: string };
 }
 
-async function getPosts(page: number, categorySlug?: string) {
+async function getPosts(page: number, subcategorySlug?: string) {
   const pageSize = 9;
 
   const where: any = { status: "published" };
-  if (categorySlug) {
-    where.category = { slug: categorySlug };
+  if (subcategorySlug) {
+    where.subcategory = { slug: subcategorySlug };
   }
 
-  const [posts, total, categories] = await Promise.all([
+  const [posts, total, subcategories] = await Promise.all([
     prisma.post.findMany({
       where,
       include: {
-        category: true,
+        subcategory: { include: { series: true } },
         _count: { select: { comments: true } },
       },
       orderBy: { publishedAt: "desc" },
@@ -29,8 +29,11 @@ async function getPosts(page: number, categorySlug?: string) {
       take: pageSize,
     }),
     prisma.post.count({ where }),
-    prisma.category.findMany({
-      include: { _count: { select: { posts: { where: { status: "published" } } } } },
+    prisma.subcategory.findMany({
+      include: {
+        series: true,
+        _count: { select: { posts: { where: { status: "published" } } } },
+      },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -39,15 +42,15 @@ async function getPosts(page: number, categorySlug?: string) {
     posts,
     total,
     totalPages: Math.ceil(total / pageSize),
-    categories,
+    subcategories,
   };
 }
 
 export default async function PostsPage({ searchParams }: PostsPageProps) {
   const page = parseInt(searchParams.page || "1");
-  const { posts, total, totalPages, categories } = await getPosts(
+  const { posts, total, totalPages, subcategories } = await getPosts(
     page,
-    searchParams.category
+    searchParams.subcategory
   );
 
   return (
@@ -66,24 +69,24 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
         <div className="flex flex-wrap gap-2 mb-8">
           <Link href="/posts">
             <Badge
-              variant={!searchParams.category ? "info" : "default"}
+              variant={!searchParams.subcategory ? "info" : "default"}
               className="px-4 py-2 cursor-pointer hover:bg-cream-300 transition-colors"
             >
               All ({total})
             </Badge>
           </Link>
-          {categories.map((category) => (
+          {subcategories.map((subcategory) => (
             <Link
-              key={category.id}
-              href={`/posts?category=${category.slug}`}
+              key={subcategory.id}
+              href={`/posts?subcategory=${subcategory.slug}`}
             >
               <Badge
                 variant={
-                  searchParams.category === category.slug ? "info" : "default"
+                  searchParams.subcategory === subcategory.slug ? "info" : "default"
                 }
                 className="px-4 py-2 cursor-pointer hover:bg-cream-300 transition-colors"
               >
-                {category.name} ({category._count.posts})
+                {subcategory.series ? `${subcategory.series.name} / ` : ""}{subcategory.name} ({subcategory._count.posts})
               </Badge>
             </Link>
           ))}
@@ -92,7 +95,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
         {posts.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-charcoal-500 mb-4">No posts found.</p>
-            {searchParams.category && (
+            {searchParams.subcategory && (
               <Link href="/posts">
                 <Button variant="outline">View All Posts</Button>
               </Link>
@@ -102,7 +105,15 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {posts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard
+                  key={post.id}
+                  post={{
+                    ...post,
+                    category: post.subcategory
+                      ? { name: post.subcategory.name, slug: post.subcategory.slug }
+                      : null,
+                  }}
+                />
               ))}
             </div>
 
@@ -110,7 +121,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
               <div className="flex items-center justify-center gap-2">
                 {page > 1 && (
                   <Link
-                    href={`/posts?page=${page - 1}${searchParams.category ? `&category=${searchParams.category}` : ""}`}
+                    href={`/posts?page=${page - 1}${searchParams.subcategory ? `&subcategory=${searchParams.subcategory}` : ""}`}
                   >
                     <Button variant="outline">Previous</Button>
                   </Link>
@@ -120,7 +131,7 @@ export default async function PostsPage({ searchParams }: PostsPageProps) {
                 </span>
                 {page < totalPages && (
                   <Link
-                    href={`/posts?page=${page + 1}${searchParams.category ? `&category=${searchParams.category}` : ""}`}
+                    href={`/posts?page=${page + 1}${searchParams.subcategory ? `&subcategory=${searchParams.subcategory}` : ""}`}
                   >
                     <Button variant="outline">Next</Button>
                   </Link>

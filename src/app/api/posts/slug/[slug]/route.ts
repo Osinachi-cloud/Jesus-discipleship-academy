@@ -9,7 +9,7 @@ export async function GET(
     const post = await prisma.post.findUnique({
       where: { slug: params.slug },
       include: {
-        category: true,
+        subcategory: { include: { series: true } },
         comments: {
           where: { approved: true },
           orderBy: { createdAt: "desc" },

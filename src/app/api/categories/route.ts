@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
         where: { parentId: null },
         include: {
           _count: {
-            select: { posts: true, media: true, children: true },
+            select: { media: true, children: true },
           },
         },
         orderBy: [{ order: "asc" }, { name: "asc" }],
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         include: {
           parent: true,
           _count: {
-            select: { posts: true, media: true, children: true },
+            select: { media: true, children: true },
           },
         },
         orderBy: [{ order: "asc" }, { name: "asc" }],
@@ -42,13 +42,13 @@ export async function GET(request: NextRequest) {
         children: {
           include: {
             _count: {
-              select: { posts: true, media: true },
+              select: { media: true },
             },
           },
           orderBy: [{ order: "asc" }, { name: "asc" }],
         },
         _count: {
-          select: { posts: true, media: true, children: true },
+          select: { media: true, children: true },
         },
       },
       orderBy: [{ order: "asc" }, { name: "asc" }],
@@ -82,7 +82,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if name already exists
     const existingName = await prisma.category.findUnique({ where: { name } });
     if (existingName) {
       return NextResponse.json(

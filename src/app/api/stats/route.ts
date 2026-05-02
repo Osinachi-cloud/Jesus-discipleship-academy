@@ -34,7 +34,7 @@ export async function GET() {
       prisma.post.findMany({
         take: 5,
         orderBy: { createdAt: "desc" },
-        include: { category: true },
+        include: { subcategory: { include: { series: true } } },
       }),
       prisma.comment.findMany({
         take: 5,

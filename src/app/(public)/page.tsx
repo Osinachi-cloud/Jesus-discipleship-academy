@@ -7,18 +7,18 @@ import prisma from "@/lib/prisma";
 import { ArrowRight, BookOpen, Video, Image as ImageIcon } from "lucide-react";
 
 async function getHomeData() {
-  const [posts, categories, mediaStats] = await Promise.all([
+  const [posts, series, mediaStats] = await Promise.all([
     prisma.post.findMany({
       where: { status: "published" },
       include: {
-        category: true,
+        subcategory: { include: { series: true } },
         _count: { select: { comments: true } },
       },
       orderBy: { publishedAt: "desc" },
       take: 6,
     }),
-    prisma.category.findMany({
-      include: { _count: { select: { posts: true } } },
+    prisma.series.findMany({
+      include: { _count: { select: { subcategories: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.media.groupBy({
@@ -27,11 +27,11 @@ async function getHomeData() {
     }),
   ]);
 
-  return { posts, categories, mediaStats };
+  return { posts, series, mediaStats };
 }
 
 export default async function HomePage() {
-  const { posts, categories, mediaStats } = await getHomeData();
+  const { posts, series, mediaStats } = await getHomeData();
 
   const getMediaCount = (type: string) => {
     const stat = mediaStats.find((s) => s.type === type);
@@ -63,7 +63,15 @@ export default async function HomePage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {posts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard
+                  key={post.id}
+                  post={{
+                    ...post,
+                    category: post.subcategory
+                      ? { name: post.subcategory.name, slug: post.subcategory.slug }
+                      : null,
+                  }}
+                />
               ))}
             </div>
           )}
@@ -73,19 +81,19 @@ export default async function HomePage() {
       <section className="py-16 bg-cream-200">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-navy-800 text-center mb-8">
-            Browse by Category
+            Browse by Series
           </h2>
 
           <div className="flex flex-wrap justify-center gap-3">
-            {categories.map((category) => (
-              <Link key={category.id} href={`/categories/${category.slug}`}>
+            {series.map((s) => (
+              <Link key={s.id} href={`/series`}>
                 <Badge
                   variant="default"
                   className="px-4 py-2 text-sm cursor-pointer hover:bg-cream-300 transition-colors"
                 >
-                  {category.name}
+                  {s.name}
                   <span className="ml-2 text-charcoal-400">
-                    ({category._count.posts})
+                    ({s._count.subcategories})
                   </span>
                 </Badge>
               </Link>

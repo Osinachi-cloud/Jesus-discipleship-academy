@@ -827,7 +827,7 @@ async function main() {
         excerpt: postData.excerpt,
         featuredImage: postData.featuredImage,
         status: "published",
-        categoryId: categories[postData.categorySlug],
+        subcategoryId: null, // Updated schema - assign subcategories manually
         publishedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random date within last 30 days
       },
     });
